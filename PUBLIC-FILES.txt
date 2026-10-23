@@ -62,3 +62,5 @@ Engine/Notices/x-image-LICENSE.txt
 Engine/Notices/x-text-LICENSE.txt
 Engine/Notices/yaml-LICENSE.txt
 Engine/.gitignore
+Sources/PaperworkCore/Resources/starter.pdf
+Tests/PaperworkCoreTests/Fixtures/generate_starter.py
