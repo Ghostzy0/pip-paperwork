@@ -22,6 +22,7 @@ if LC_ALL=C grep -aqE '(/Users/|/home/)' "$app/Contents/MacOS/Paperwork"; then
   exit 1
 fi
 cp LICENSE "$app/Contents/Resources/LICENSE"
+cp Sources/PaperworkCore/Resources/starter.pdf "$app/Contents/Resources/starter.pdf"
 cp -R Engine/Notices "$app/Contents/Resources/ThirdPartyNotices"
 cp Engine/build/canonical-pdf "$app/Contents/Resources/canonical-pdf"
 codesign --force --sign - "$app/Contents/Resources/canonical-pdf"
