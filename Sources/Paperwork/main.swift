@@ -7,13 +7,16 @@ final class TopStackView: NSStackView { override var isFlipped: Bool { true } }
 
 // Modal NSAlert field editors may have no window undo manager. This editor owns only
 // the temporary input's typing history, never the PDF's document history.
-final class UndoInputTextView: NSTextView {
+final class UndoInputTextView: NSTextView, NSTextViewDelegate {
     private let typingHistory = UndoManager()
     var submit: (() -> Void)?
     var cancel: (() -> Void)?
     override var undoManager: UndoManager? { typingHistory }
+    func undoManager(for view: NSTextView) -> UndoManager? { typingHistory }
     override func insertNewline(_ sender: Any?) { submit?() }
     override func cancelOperation(_ sender: Any?) { cancel?() }
+    override func insertTab(_ sender: Any?) { window?.selectNextKeyView(self) }
+    override func insertBacktab(_ sender: Any?) { window?.selectPreviousKeyView(self) }
 }
 
 final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDFViewDelegate, NSMenuItemValidation {
@@ -225,6 +228,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
             return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
         }
         let editor = UndoInputTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 36))
+        editor.delegate = editor
         editor.isRichText = false; editor.importsGraphics = false; editor.allowsUndo = true
         editor.undoManager?.runLoopModes = [.default, .modalPanel]
         editor.font = .systemFont(ofSize: 13); editor.string = value
@@ -233,6 +237,10 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         editor.submit = { [weak alert] in alert?.buttons.first?.performClick(nil) }
         editor.cancel = { [weak alert] in alert?.buttons.last?.performClick(nil) }
         alert.accessoryView = editor; alert.window.initialFirstResponder = editor
+        defer {
+            editor.undoManager?.removeAllActions()
+            editor.delegate = nil; editor.submit = nil; editor.cancel = nil
+        }
         return alert.runModal() == .alertFirstButtonReturn ? editor.string : nil
     }
     func focusedTextEditor() -> NSTextView? {
