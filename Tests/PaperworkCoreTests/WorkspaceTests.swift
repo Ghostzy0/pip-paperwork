@@ -12,11 +12,15 @@ final class WorkspaceTests: XCTestCase {
         let appRoot = fixtures.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let helperPath = ProcessInfo.processInfo.environment["PAPERWORK_ENGINE"] ?? appRoot.appendingPathComponent("Engine/build/canonical-pdf").path
         CanonicalPDF.helperURL = URL(fileURLWithPath: helperPath)
+        SampleDocument.resourceURL = appRoot.appendingPathComponent("Sources/PaperworkCore/Resources/starter.pdf")
         guard fm.isExecutableFile(atPath: helperPath) else { throw PaperworkError.invalid("Build the canonical PDF helper first, or set PAPERWORK_ENGINE to its executable.") }
         directory = fm.temporaryDirectory.appendingPathComponent("paperwork-r1-\(UUID().uuidString)")
         try fm.createDirectory(at: directory, withIntermediateDirectories: true)
     }
-    override func tearDownWithError() throws { if let directory { try fm.removeItem(at: directory) } }
+    override func tearDownWithError() throws {
+        SampleDocument.resourceURL = nil
+        if let directory { try fm.removeItem(at: directory) }
+    }
     func input(_ name: String = "three-pages.pdf") throws -> URL {
         let url = directory.appendingPathComponent(name)
         try fm.copyItem(at: fixtures.appendingPathComponent(name), to: url)
@@ -141,15 +145,35 @@ final class WorkspaceTests: XCTestCase {
         let url = directory.appendingPathComponent("annotations.pdf")
         try ws.saveCopy(to: url)
         let reopened = try Workspace.load(url), annotations = try reopened.page(0).annotations
-        XCTAssertEqual(annotations.count, 5)
-        XCTAssertEqual(Set(annotations.compactMap(\.type)), Set(["Highlight", "Underline", "StrikeOut", "Text", "Ink"]))
-        XCTAssertEqual(Set(annotations.compactMap(\.contents)), Set(AnnotationKind.allCases.map { "synthetic \($0.rawValue)" }))
-        XCTAssertEqual(annotations.first(where: { $0.type == "Ink" })?.paths?.count, 1)
-        try reopened.removeAnnotation(page: 0, annotation: 0)
-        XCTAssertEqual(try reopened.page(0).annotations.count, 4)
+        let logicalAnnotations = annotations.filter { $0.type != "Popup" }
+        let textAnnotation = try XCTUnwrap(logicalAnnotations.first(where: { $0.type == "Text" }))
+        let popups = annotations.filter { $0.type == "Popup" }
+        XCTAssertEqual(logicalAnnotations.count, 5)
+        XCTAssertLessThanOrEqual(popups.count, 1, "A text annotation may have one ancillary popup")
+        if let popup = textAnnotation.popup {
+            XCTAssertEqual(popup.type, "Popup")
+            XCTAssertEqual(popups.count, 1)
+            XCTAssertTrue(popups.contains(where: { $0 === popup }), "The ancillary popup must belong to the Text annotation")
+        } else {
+            XCTAssertTrue(popups.isEmpty, "A popup cannot appear without its parent Text annotation")
+        }
+        XCTAssertEqual(Set(logicalAnnotations.compactMap(\.type)), Set(["Highlight", "Underline", "StrikeOut", "Text", "Ink"]))
+        XCTAssertEqual(Set(logicalAnnotations.compactMap(\.contents)), Set(AnnotationKind.allCases.map { "synthetic \($0.rawValue)" }))
+        XCTAssertEqual(logicalAnnotations.first(where: { $0.type == "Ink" })?.paths?.count, 1)
+        let removableIndex = try XCTUnwrap(annotations.firstIndex(where: { $0.type != "Popup" }))
+        try reopened.removeAnnotation(page: 0, annotation: removableIndex)
+        XCTAssertEqual(try reopened.page(0).annotations.filter { $0.type != "Popup" }.count, 4)
         try reopened.undo()
-        XCTAssertEqual(try reopened.page(0).annotations.count, 5)
+        XCTAssertEqual(try reopened.page(0).annotations.filter { $0.type != "Popup" }.count, 5)
         try output(url, name: "annotations.pdf")
+    }
+    func testMissingStarterResourceFailsClearly() throws {
+        let configured = SampleDocument.resourceURL
+        SampleDocument.resourceURL = directory.appendingPathComponent("missing-starter.pdf")
+        defer { SampleDocument.resourceURL = configured }
+        XCTAssertThrowsError(try SampleDocument.make()) { error in
+            XCTAssertTrue(error.localizedDescription.contains("sample document is missing"))
+        }
     }
     func testSelectedTextMarkupsPersist() throws {
         let ws = try workspace()
