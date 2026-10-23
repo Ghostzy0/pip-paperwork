@@ -1,0 +1,11 @@
+# Privacy, storage and permissions
+
+The runtime uses local PDFKit/Vision and a bundled pinned canonical PDF writer. Private temporary input, template and request files are mode 0600 inside an app-created mode 0700 temporary directory and are removed after completion/failure; a crash can leave temporary data until system cleanup. App source has no HTTP client, account, telemetry or updater. PDF links and embedded remote actions are inert in the reader. The operating system and file providers may have independent network behaviour; a file selected from a synchronised folder may be managed by its provider.
+
+The opened PDF is held in memory. Undo retains at most 20 snapshots within a 96 MB budget. Input is bounded to 180 MB and 2,000 pages; files too large for safe undo must be extracted into smaller parts before editing. Exports are user-selected separate files, mode 0600. Save never replaces the source or any existing destination. No signing keys, passwords or account credentials are stored by the app. Encrypted documents stay read-only after password unlock.
+
+Recovery is off by default and opt-in per launch. Enabling it keeps PDF content on this Mac after each edit. Baseline and Pip use different folders under `~/Library/Application Support/`; see the UI's recovery status and File menu. Recovery files are not app-encrypted and may be included in local backups. File > Restore recovery opens a dirty working copy; File > Discard recovery deletes only the recovery file after confirmation. Turning recovery off does not silently delete an existing file. Ordinary app exit does not automatically clear opted-in recovery.
+
+No screen/microphone/accessibility or full-disk permission is needed for the app's core. macOS may ask for access to a chosen protected folder. The owner should use the normal OS picker/permission flow. The app is not sandboxed in this experimental build; use trusted documents and keep important backups. No special entitlement or background service is installed.
+
+OCR recognises English on-device. Its separate searchable copy contains raster pages plus invisible recognised text. It can lose interactive forms, editable annotations, vector detail, internal links and original metadata. Do not use OCR/flatten exports as secure redaction. No redaction or cryptographic signing is implemented.

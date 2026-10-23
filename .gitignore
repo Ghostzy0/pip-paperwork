@@ -1,0 +1,9 @@
+.build/
+build/
+.swiftpm/
+.local-evidence/
+.DS_Store
+
+.build-tools/
+Engine/build/
+.build-tools

@@ -1,0 +1,15 @@
+# Pip Paperwork
+
+> Experimental original local PDF workspace for Apple silicon macOS. MIT original source; separately licensed pdfcpu canonical writer. No account or cloud runtime. Qualification status is explicit in TESTING.md.
+
+- [Overview and build](README.md)
+- [Actual tests and pending gates](TESTING.md)
+- [Human workflow](docs/HOW-TO.md)
+- [Questions and limits](docs/FAQ.md)
+- [AI setup](docs/AI-SETUP.md)
+- [Privacy and local data](docs/PRIVACY.md)
+- [Provenance and licences](UPSTREAM.md)
+- [Known parity gaps](PARITY.md)
+- [Release notes](docs/RELEASE-NOTES.md)
+
+This file is a navigation convenience. It is not a capability guarantee or a promise of search ranking. Prefer current source and measured release receipts over planned work.

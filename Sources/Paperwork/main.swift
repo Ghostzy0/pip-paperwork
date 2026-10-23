@@ -1,0 +1,479 @@
+import AppKit
+import PDFKit
+import PaperworkCore
+import UniformTypeIdentifiers
+
+final class TopStackView: NSStackView { override var isFlipped: Bool { true } }
+
+final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDFViewDelegate, NSMenuItemValidation {
+    var window: NSWindow!
+    let reader = ReaderView()
+    let thumbnails = PDFThumbnailView()
+    let status = NSTextField(wrappingLabelWithString: "Open a PDF to get started. Everything works on this Mac.")
+    let titleLabel = NSTextField(labelWithString: "Paperwork Baseline")
+    let detail = NSTextField(labelWithString: "Local PDF workspace")
+    let pageLabel = NSTextField(labelWithString: "No PDF open")
+    let search = NSSearchField()
+    let inspector = TopStackView()
+    let inspectorScroll = NSScrollView()
+    let empty = NSStackView()
+    let progress = NSProgressIndicator()
+    let edition = PaperworkEdition.resolve()
+    let pipMark = PipPebbleView(frame: NSRect(x: 0, y: 0, width: 34, height: 34))
+    var contentView: NSView?
+    var theme = PipTheme(rawValue: UserDefaults.standard.string(forKey: "io.github.ghostzy0.paperwork.theme") ?? "paper") ?? .paper
+    var colorMode = PaperworkColorMode(rawValue: UserDefaults.standard.string(forKey: "io.github.ghostzy0.paperwork.colorMode") ?? "system") ?? .system
+    var pausePipItem: NSMenuItem?
+    var ws: Workspace?
+    var busy = false
+    var cancelFlag: CancellationFlag?
+    var controls: [String: NSButton] = [:]
+    var matches: [PDFSelection] = []
+    var matchIndex = 0
+    var recoveryEnabled = false
+    var displayedWorkspace: ObjectIdentifier?
+    var displayedRevision = -1
+    var displayedLocked = false
+    var closingApproved = false
+    var pendingOpen: URL?
+    var recoveryURL: URL {
+        let directory = PaperworkEdition.dataDirectory(edition: edition)
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(directory, isDirectory: true)
+            .appendingPathComponent("recovery.pdf")
+    }
+    var currentIndex: Int { guard let page = reader.currentPage, let pdf = reader.document else { return 0 }; let index = pdf.index(for: page); return index == NSNotFound ? 0 : index }
+    func index(of page: PDFPage) -> Int { guard let document = page.document else { return 0 }; let n = document.index(for: page); return n == NSNotFound ? 0 : n }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        CanonicalPDF.helperURL = Bundle.main.resourceURL?.appendingPathComponent("canonical-pdf")
+        NSApp.setActivationPolicy(.regular)
+        NotificationCenter.default.addObserver(self, selector: #selector(textEditingBegan(_:)), name: NSControl.textDidBeginEditingNotification, object: nil)
+        setupMenu(); setupWindow()
+        if let pendingOpen { openURL(pendingOpen) }
+        else if let input = CommandLine.arguments.dropFirst().first(where: { $0.hasSuffix(".pdf") }) { openURL(URL(fileURLWithPath: input)) }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        guard let first = filenames.first else { sender.reply(toOpenOrPrint: .failure); return }
+        let url = URL(fileURLWithPath: first)
+        if window == nil { pendingOpen = url } else if !busy && canLeave() { openURL(url) }
+        sender.reply(toOpenOrPrint: .success)
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply { closingApproved || canLeave() ? .terminateNow : .terminateCancel }
+    func windowShouldClose(_ sender: NSWindow) -> Bool { closingApproved = canLeave(); return closingApproved }
+    func canLeave() -> Bool {
+        if busy { showError(PaperworkError.invalid("Stop the current task before closing the workspace.")); return false }
+        guard ws?.dirty == true else { return true }
+        return confirm("Leave this working copy?", "Save a separate copy first to keep your changes. Your opened original is unchanged.", action: "Leave without saving")
+    }
+    func setupMenu() {
+        let root = NSMenu()
+        func menu(_ name: String, _ entries: [(String, String, String)]) {
+            let item = NSMenuItem(); let sub = NSMenu(title: name); item.submenu = sub; root.addItem(item)
+            for (title, key, action) in entries {
+                if title == "-" { sub.addItem(.separator()); continue }
+                let child = NSMenuItem(title: title, action: #selector(command(_:)), keyEquivalent: key); child.representedObject = action; child.target = self; sub.addItem(child)
+            }
+        }
+        menu(edition.displayName, [("About \(edition.displayName)", "", "about"), ("-", "", ""), ("Quit \(edition.displayName)", "q", "quit")])
+        menu("File", [("Open PDF…", "o", "open"), ("Open sample", "", "sample"), ("Save a copy…", "s", "save"), ("Extract pages…", "", "extract"), ("Split into page files…", "", "split"), ("Insert or merge PDF…", "", "insert"), ("Optimise a copy…", "", "optimise"), ("Searchable scan copy…", "", "ocr"), ("Export text…", "", "text"), ("Export page image…", "", "image"), ("Flatten a copy…", "", "flatten"), ("-", "", ""), ("Enable local recovery", "", "recovery"), ("Restore recovery", "", "restore"), ("Discard recovery", "", "discard")])
+        menu("Edit", [("Undo document change", "z", "undo"), ("Redo document change", "Z", "redo"), ("Find…", "f", "find"), ("Find next", "g", "nextMatch"), ("Copy selected text", "c", "copy"), ("Select text tool", "", "select"), ("Highlight selection", "", "highlight"), ("Underline selection", "", "underline"), ("Strike through selection", "", "strikeOut"), ("Sticky note tool", "", "note"), ("Freehand tool", "", "ink")])
+        menu("Pages", [("Previous page", "[", "previous"), ("Next page", "]", "next"), ("Go to page…", "l", "go"), ("Rotate clockwise", "r", "rotate"), ("Move page earlier", "", "earlier"), ("Move page later", "", "later"), ("Delete this page…", "", "delete")])
+        var viewItems: [(String, String, String)] = [("Zoom in", "+", "zoomIn"), ("Zoom out", "-", "zoomOut"), ("Fit page width", "0", "fit"), ("Toggle dark appearance", "", "dark")]
+        if edition.usesPipTheme {
+            viewItems.append(("Paper appearance", "", "themePaper"))
+            viewItems.append(("Oat appearance", "", "themeOat"))
+            viewItems.append(("Use system appearance", "", "modeSystem"))
+            viewItems.append(("Use light appearance", "", "modeLight"))
+            viewItems.append(("Use dark appearance", "", "modeDark"))
+            viewItems.append(("Pause Pip", "", "pausePip"))
+        }
+        menu("View", viewItems)
+        if let viewMenu = root.items.first(where: { $0.submenu?.title == "View" })?.submenu {
+            pausePipItem = viewMenu.items.first(where: { ($0.representedObject as? String) == "pausePip" })
+            pausePipItem?.state = pipMark.isPaused ? .on : .off
+        }
+        if let edit = root.items.first(where: { $0.submenu?.title == "Edit" })?.submenu {
+            if let copy = edit.items.first(where: { ($0.representedObject as? String) == "copy" }) { edit.removeItem(copy) }
+            for (title, key, action) in [("Cut", "x", #selector(NSText.cut(_:))), ("Copy", "c", #selector(NSText.copy(_:))), ("Paste", "v", #selector(NSText.paste(_:))), ("Select all", "a", #selector(NSText.selectAll(_:)))] {
+                let item = NSMenuItem(title: title, action: action, keyEquivalent: key); item.target = nil; edit.addItem(item)
+            }
+        }
+        NSApp.mainMenu = root
+    }
+    func label(_ text: String, size: CGFloat = 13, weight: NSFont.Weight = .regular, secondary: Bool = false) -> NSTextField {
+        let field = NSTextField(wrappingLabelWithString: text); field.font = .systemFont(ofSize: size, weight: weight); field.textColor = secondary ? .secondaryLabelColor : .labelColor; return field
+    }
+    func button(_ title: String, _ action: String) -> NSButton {
+        let b: NSButton = edition.usesPipTheme ? PipActionButton(title: title, target: self, action: #selector(command(_:))) : NSButton(title: title, target: self, action: #selector(command(_:))); if let pip = b as? PipActionButton { pip.primary = action == "save" }; b.identifier = .init(action); b.bezelStyle = .rounded; b.setAccessibilityLabel(title); b.toolTip = title; controls[action] = b; return b
+    }
+    func row(_ views: [NSView], spacing: CGFloat = 8) -> NSStackView { let stack = NSStackView(views: views); stack.orientation = .horizontal; stack.spacing = spacing; stack.alignment = .centerY; return stack }
+    func column(_ views: [NSView], spacing: CGFloat = 12) -> NSStackView { let stack = NSStackView(views: views); stack.orientation = .vertical; stack.spacing = spacing; stack.alignment = .leading; return stack }
+    func setupWindow() {
+        window = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 1220, height: 820), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        window.title = edition.displayName; window.minSize = NSSize(width: 1000, height: 640); window.delegate = self
+        let content = PipCanvasView(); window.contentView = content; contentView = content
+        content.appearanceChanged = { [weak self] in self?.updatePipColors() }
+        content.wantsLayer = true
+        titleLabel.font = .systemFont(ofSize: 23, weight: .semibold); detail.textColor = .secondaryLabelColor; detail.font = .systemFont(ofSize: 13)
+        titleLabel.stringValue = edition.displayName
+        pipMark.isHidden = !edition.usesPipTheme
+        pipMark.widthAnchor.constraint(equalToConstant: 34).isActive = true
+        pipMark.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        search.placeholderString = "Find in this PDF"; search.setAccessibilityLabel("Find in this PDF"); search.target = self; search.action = #selector(findText); search.widthAnchor.constraint(equalToConstant: 210).isActive = true
+        let spacer = NSView(); spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        let titleGroup = column([titleLabel, detail], spacing: 4)
+        let titleWithPip = row([pipMark, titleGroup], spacing: 10)
+        let header = row([edition.usesPipTheme ? titleWithPip : titleGroup, spacer, search, button("Find", "search"), button("Open PDF", "open"), button("Save a copy", "save")])
+        let tools = row([button("Select", "select"), button("Highlight", "highlight"), button("Underline", "underline"), button("Strike", "strikeOut"), button("Note", "note"), button("Freehand", "ink"), button("Undo", "undo"), button("Redo", "redo"), button("More…", "more")])
+        let pagebar = row([button("‹", "previous"), pageLabel, button("›", "next"), button("Go to…", "go"), button("−", "zoomOut"), button("+", "zoomIn"), button("Fit", "fit"), button("Rotate", "rotate"), button("Earlier", "earlier"), button("Later", "later"), button("Delete…", "delete")])
+        controls["previous"]?.setAccessibilityLabel("Previous page"); controls["next"]?.setAccessibilityLabel("Next page"); controls["zoomOut"]?.setAccessibilityLabel("Zoom out"); controls["zoomIn"]?.setAccessibilityLabel("Zoom in")
+        reader.autoScales = true; reader.displayMode = .singlePageContinuous; reader.displayDirection = .vertical; reader.delegate = self; reader.setAccessibilityLabel("PDF document")
+        thumbnails.pdfView = reader; thumbnails.thumbnailSize = NSSize(width: 116, height: 150); thumbnails.backgroundColor = .controlBackgroundColor; thumbnails.setAccessibilityLabel("Page thumbnails")
+        let thumbPanel = column([label("PAGES", size: 11, weight: .semibold, secondary: true), thumbnails]); thumbPanel.widthAnchor.constraint(equalToConstant: 156).isActive = true; thumbnails.widthAnchor.constraint(equalTo: thumbPanel.widthAnchor).isActive = true
+        inspector.orientation = .vertical; inspector.alignment = .leading; inspector.spacing = 12; inspector.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16); inspector.translatesAutoresizingMaskIntoConstraints = false
+        inspectorScroll.documentView = inspector; inspectorScroll.hasVerticalScroller = true; inspectorScroll.drawsBackground = false; inspectorScroll.widthAnchor.constraint(equalToConstant: 216).isActive = true; inspector.widthAnchor.constraint(equalTo: inspectorScroll.contentView.widthAnchor).isActive = true
+        let viewer = NSView(); reader.translatesAutoresizingMaskIntoConstraints = false; viewer.addSubview(reader)
+        empty.orientation = .vertical; empty.alignment = .centerX; empty.spacing = 16
+        empty.addArrangedSubview(label("Your documents. Your Mac.", size: 26, weight: .semibold))
+        empty.addArrangedSubview(label("Read, mark up and organise PDFs locally.\nSave a separate copy when you are ready.", size: 15, secondary: true))
+        empty.addArrangedSubview(button("Open a PDF", "open")); empty.addArrangedSubview(button("Try the sample", "sample")); empty.translatesAutoresizingMaskIntoConstraints = false; viewer.addSubview(empty)
+        NSLayoutConstraint.activate([reader.leadingAnchor.constraint(equalTo: viewer.leadingAnchor), reader.trailingAnchor.constraint(equalTo: viewer.trailingAnchor), reader.topAnchor.constraint(equalTo: viewer.topAnchor), reader.bottomAnchor.constraint(equalTo: viewer.bottomAnchor), empty.centerXAnchor.constraint(equalTo: viewer.centerXAnchor), empty.centerYAnchor.constraint(equalTo: viewer.centerYAnchor)])
+        let body = row([thumbPanel, viewer, inspectorScroll], spacing: 12); body.alignment = .height
+        status.font = .systemFont(ofSize: 12); status.textColor = .secondaryLabelColor; status.maximumNumberOfLines = 2
+        progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
+        let foot = row([progress, status, button("Stop", "stop")]); controls["stop"]?.isHidden = true
+        let root = column([header, tools, pagebar, body, foot], spacing: 12); root.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16); root.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(root)
+        NSLayoutConstraint.activate([root.leadingAnchor.constraint(equalTo: content.leadingAnchor), root.trailingAnchor.constraint(equalTo: content.trailingAnchor), root.topAnchor.constraint(equalTo: content.topAnchor), root.bottomAnchor.constraint(equalTo: content.bottomAnchor), header.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -32), body.widthAnchor.constraint(equalTo: header.widthAnchor), foot.widthAnchor.constraint(equalTo: header.widthAnchor), body.heightAnchor.constraint(greaterThanOrEqualToConstant: 300)])
+        body.setContentHuggingPriority(.init(1), for: .vertical); viewer.setContentHuggingPriority(.init(1), for: .horizontal)
+        NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: reader)
+        reader.editField = { [weak self] p, a in self?.editForm(p, a) }
+        reader.noteAt = { [weak self] p, point in self?.addNote(p, point) }
+        reader.inkDone = { [weak self] p, points in self?.addInk(p, points) }
+        applyPipAppearance()
+        refresh(); window.center(); window.makeKeyAndOrderFront(nil)
+    }
+    func applyPipAppearance() {
+        guard edition.usesPipTheme, let window, contentView != nil else { return }
+        switch colorMode {
+        case .system: window.appearance = nil
+        case .light: window.appearance = NSAppearance(named: .aqua)
+        case .dark: window.appearance = NSAppearance(named: .darkAqua)
+        }
+        updatePipColors()
+    }
+    func updatePipColors() {
+        guard edition.usesPipTheme, let window, let contentView else { return }
+        let dark = window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let palette = PipPalette.make(theme: theme, dark: dark)
+        contentView.layer?.backgroundColor = palette.canvas.cgColor
+        reader.backgroundColor = palette.canvas
+        thumbnails.backgroundColor = palette.canvas
+        inspectorScroll.backgroundColor = palette.canvas
+        pipMark.palette = palette
+        titleLabel.textColor = palette.ink
+        detail.textColor = palette.secondary
+        status.textColor = palette.secondary
+        pageLabel.textColor = palette.secondary
+        applyColors(to: contentView, palette: palette)
+    }
+    func applyColors(to view: NSView, palette: PipPalette) {
+        // PDFKit owns document colors and its internal widgets; only theme our chrome.
+        if view is PDFView || view is PDFThumbnailView { return }
+        if let button = view as? PipActionButton { button.palette = palette }
+        if let field = view as? NSTextField {
+            let secondary = field === detail || field === status || field === pageLabel || field.textColor == .secondaryLabelColor
+            field.textColor = secondary ? palette.secondary : palette.ink
+        }
+        view.subviews.forEach { applyColors(to: $0, palette: palette) }
+    }
+    func announce(_ message: String) { status.stringValue = message; NSAccessibility.post(element: status, notification: .announcementRequested, userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.medium.rawValue]) }
+    @objc func textEditingBegan(_ notification: Notification) {
+        // AppKit field editors default to no undo. Keep typing history separate from PDF history,
+        // including editors inside modal form sheets rather than only the main search field.
+        let editor = notification.userInfo?["NSFieldEditor"] as? NSTextView
+            ?? (NSApp.keyWindow?.firstResponder as? NSTextView)
+        if editor?.isFieldEditor == true { editor?.allowsUndo = true }
+    }
+    func showError(_ error: Error) {
+        let message = (error as? PaperworkError)?.localizedDescription ?? "The operation could not finish. Check the file and folder permissions, then try again."
+        announce(message); let alert = NSAlert(); alert.messageText = "Could not finish"; alert.informativeText = message; alert.addButton(withTitle: "OK"); alert.beginSheetModal(for: window)
+    }
+    func confirm(_ title: String, _ message: String, action: String) -> Bool {
+        let alert = NSAlert(); alert.messageText = title; alert.informativeText = message; alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: action); return alert.runModal() == .alertSecondButtonReturn
+    }
+    func input(_ title: String, message: String = "", value: String = "", secret: Bool = false) -> String? {
+        let alert = NSAlert(); alert.messageText = title; alert.informativeText = message
+        let field: NSTextField = secret ? NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 28)) : NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 28))
+        field.stringValue = value; field.setAccessibilityLabel(title); alert.accessoryView = field; alert.addButton(withTitle: "Continue"); alert.addButton(withTitle: "Cancel"); alert.window.initialFirstResponder = field
+        return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
+    }
+    func refresh(page: Int? = nil) {
+        let index = page ?? currentIndex
+        reader.workspace = ws
+        let identity = ws.map { ObjectIdentifier($0) }
+        if identity != displayedWorkspace || displayedRevision != ws?.revision || displayedLocked != (ws?.document.isLocked ?? false) {
+            if let pdf = ws?.document {
+                // PDFKit's inline widgets can be edited through keyboard/accessibility even when
+                // mouseDown is intercepted. Render a read-only copy; all edits use the core.
+                let rendered = pdf.dataRepresentation().flatMap(PDFDocument.init(data:))
+                for i in 0..<(rendered?.pageCount ?? 0) { for field in rendered?.page(at: i)?.annotations ?? [] where field.type == "Widget" { field.isReadOnly = true } }
+                reader.document = rendered ?? (pdf.isLocked ? pdf : nil)
+            } else { reader.document = nil }
+            displayedWorkspace = identity; displayedRevision = ws?.revision ?? -1; displayedLocked = ws?.document.isLocked ?? false; matches = []
+        }
+        empty.isHidden = ws != nil; reader.isHidden = ws == nil
+        if let ws {
+            detail.stringValue = (ws.sourceURL?.lastPathComponent ?? "Sample PDF") + (ws.dirty ? " · Unsaved changes" : " · Original preserved")
+            if let p = reader.document?.page(at: min(max(0, index), max(0, ws.document.pageCount - 1))) { reader.go(to: p) }
+        } else { detail.stringValue = "Local PDF workspace" }
+        reader.interactionEnabled = !busy
+        for (action, b) in controls { b.isEnabled = enabled(action) }
+        pageChanged(); updateInspector()
+    }
+    func enabled(_ action: String) -> Bool {
+        if action == "stop" { return busy }
+        if busy { return false }
+        if ["open", "sample", "about", "quit", "more", "dark", "restore", "discard", "recovery", "themePaper", "themeOat", "modeSystem", "modeLight", "modeDark", "pausePip"].contains(action) { return true }
+        guard let ws else { return false }
+        if action == "undo" { return ws.canUndo }
+        if action == "redo" { return ws.canRedo }
+        if ["highlight", "underline", "strikeOut", "note", "ink", "rotate", "earlier", "later", "delete", "insert"].contains(action) { return ws.editable }
+        if ["save", "extract", "split", "optimise", "ocr", "text", "image", "flatten"].contains(action) { return !ws.encryptedInput && !ws.signedInput && !ws.document.isLocked && ws.document.allowsCopying }
+        return !ws.document.isLocked
+    }
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let action = item.representedObject as? String ?? ""
+        if action == "undo" || action == "redo", let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor {
+            item.title = action == "undo" ? "Undo typing" : "Redo typing"
+            return action == "undo" ? (editor.undoManager?.canUndo ?? false) : (editor.undoManager?.canRedo ?? false)
+        }
+        if action == "undo" || action == "redo" { item.title = action == "undo" ? "Undo document change" : "Redo document change" }
+        if action == "themePaper" || action == "themeOat" || action == "modeSystem" || action == "modeLight" || action == "modeDark" {
+            let selected = ["themePaper": theme == .paper, "themeOat": theme == .oat, "modeSystem": colorMode == .system, "modeLight": colorMode == .light, "modeDark": colorMode == .dark][action] ?? false
+            item.state = selected ? .on : .off
+            return edition.usesPipTheme
+        }
+        if action == "pausePip" { item.state = pipMark.isPaused ? .on : .off; return edition.usesPipTheme }
+        return enabled(action)
+    }
+    @objc func pageChanged() {
+        guard let ws, !ws.document.isLocked else { pageLabel.stringValue = ws?.document.isLocked == true ? "Locked PDF" : "No PDF open"; return }
+        pageLabel.stringValue = "\(currentIndex + 1) / \(ws.document.pageCount)"; updateInspector()
+    }
+    func updateInspector() {
+        for v in inspector.arrangedSubviews { inspector.removeArrangedSubview(v); v.removeFromSuperview() }
+        inspector.addArrangedSubview(label("DOCUMENT", size: 11, weight: .semibold, secondary: true))
+        guard let ws else { inspector.addArrangedSubview(label("Open a PDF to see its notes and form fields.", secondary: true)); return }
+        if let reason = ws.readOnlyReason { inspector.addArrangedSubview(label(reason, secondary: true)); if ws.document.isLocked { inspector.addArrangedSubview(button("Unlock PDF", "unlock")) }; return }
+        inspector.addArrangedSubview(label("Page \(currentIndex + 1)", size: 18, weight: .semibold))
+        if let p = ws.document.page(at: currentIndex) {
+            if p.annotations.isEmpty { inspector.addArrangedSubview(label("No annotations on this page. Select text and choose a mark-up tool.", secondary: true)) }
+            for (i, a) in p.annotations.enumerated() {
+                let title = a.type == "Widget" ? (a.fieldName ?? "Form field") : (a.type ?? "Annotation")
+                inspector.addArrangedSubview(label(title, weight: .semibold))
+                inspector.addArrangedSubview(label(a.widgetStringValue ?? a.contents ?? "", secondary: true))
+                let action = NSButton(title: a.type == "Widget" ? "Edit field…" : "Remove annotation", target: self, action: #selector(inspectorAction(_:))); action.tag = i; action.isEnabled = ws.editable; inspector.addArrangedSubview(action)
+            }
+        }
+        inspector.addArrangedSubview(label("Your original stays unchanged. Save a copy to keep these edits.", size: 12, secondary: true))
+        inspector.addArrangedSubview(button("Insert or merge…", "insert")); inspector.addArrangedSubview(button("Extract pages…", "extract")); inspector.addArrangedSubview(button("Searchable scan…", "ocr"))
+        inspector.addArrangedSubview(label(recoveryEnabled ? "Recovery is on. A private local copy is kept after each edit." : "Recovery is off. Enable it in File to keep an editable local snapshot.", size: 12, secondary: true))
+        for (action, b) in controls { b.isEnabled = enabled(action) }
+        updatePipColors()
+    }
+    func perform(_ body: () throws -> Void, message: String = "Working copy updated. Save a copy to keep it.", page: Int? = nil, storeRecovery: Bool = true) {
+        let retainedPage = page ?? currentIndex
+        do {
+            try body()
+            refresh(page: retainedPage)
+            if storeRecovery, recoveryEnabled, let ws, ws.dirty { try Recovery.store(ws, at: recoveryURL) }
+            announce(message)
+            if edition.usesPipTheme && (message.hasPrefix("Copy saved to") || message == "Local recovery enabled.") { pipMark.acknowledgeSuccess() }
+        } catch { refresh(page: retainedPage); showError(error) }
+    }
+    @objc func command(_ sender: Any) {
+        let action = (sender as? NSMenuItem)?.representedObject as? String ?? (sender as? NSButton)?.identifier?.rawValue ?? ""
+        if sender is NSMenuItem, action == "undo" || action == "redo", let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor {
+            if action == "undo", editor.undoManager?.canUndo == true { editor.undoManager?.undo() }
+            if action == "redo", editor.undoManager?.canRedo == true { editor.undoManager?.redo() }
+            return
+        }
+        guard enabled(action) else { return }
+        switch action {
+        case "open": openPicker()
+        case "sample": if canLeave() { do { ws = try SampleDocument.make(); refresh(page: 0); announce("Sample PDF opened. It contains synthetic content.") } catch { showError(error) } }
+        case "save": save()
+        case "quit": NSApp.terminate(nil)
+        case "undo": perform({ try ws?.undo() })
+        case "redo": perform({ try ws?.redo() })
+        case "rotate": perform({ try ws?.rotate(currentIndex) })
+        case "earlier": let i = currentIndex; perform({ try ws?.move(i, by: -1) }, page: max(0, i - 1))
+        case "later": let i = currentIndex; perform({ try ws?.move(i, by: 1) }, page: i + 1)
+        case "delete": if confirm("Delete this page from the working copy?", "Your original stays unchanged. You can undo this change.", action: "Delete page") { perform({ try ws?.delete(currentIndex) }) }
+        case "previous": reader.goToPreviousPage(nil)
+        case "next": reader.goToNextPage(nil)
+        case "go": if let s = input("Go to page", value: "\(currentIndex + 1)"), let n = Int(s), let p = reader.document?.page(at: n - 1) { reader.go(to: p) }
+        case "zoomIn": reader.zoomIn(nil)
+        case "zoomOut": reader.zoomOut(nil)
+        case "fit": reader.autoScales = true
+        case "find": window.makeFirstResponder(search)
+        case "search": findText()
+        case "nextMatch": if !matches.isEmpty { matchIndex = (matchIndex + 1) % matches.count; showMatch() }
+        case "copy": reader.copy(nil)
+        case "select", "note", "ink": reader.tool = action; announce(action == "select" ? "Select text in the PDF." : (action == "note" ? "Click a page to add a sticky note." : "Drag within a page to draw a line."))
+        case "highlight", "underline", "strikeOut":
+            guard let selection = reader.currentSelection, let kind = AnnotationKind(rawValue: action) else { announce("Select some text in the PDF first."); return }; perform({ try ws?.markSelection(selection, kind: kind) })
+        case "unlock": if let password = input("Unlock PDF", message: "The password is used only now. Encrypted PDFs stay read-only.", secret: true) { perform({ try ws?.unlock(password) }, message: "PDF unlocked for reading.") }
+        case "insert": insert()
+        case "extract": extract()
+        case "split": split()
+        case "optimise": save(options: [.saveImagesAsJPEGOption: true, .optimizeImagesForScreenOption: true], suffix: "optimised", message: "Optimisation may reduce image detail and may not make every PDF smaller.")
+        case "flatten": save(options: [.burnInAnnotationsOption: true], suffix: "flattened", message: "Annotations will become page content. Keep an editable copy too.")
+        case "ocr": startOCR()
+        case "text": exportText()
+        case "image": exportImage()
+        case "stop": cancelFlag?.cancel(); announce("Stopping after the current recognition request. Your working copy is kept.")
+        case "recovery":
+            if recoveryEnabled { recoveryEnabled = false; announce("Recovery is off. Existing recovery remains until you discard it.") }
+            else if confirm("Keep a local recovery copy?", "Document content will be stored in this app’s Application Support folder after each edit. It is not encrypted by the app. You can discard it in File.", action: "Enable recovery") { recoveryEnabled = true; if let ws, ws.editable { perform({ try Recovery.store(ws, at: recoveryURL) }, message: "Local recovery enabled.") } }; updateInspector()
+        case "restore": if canLeave() { perform({ ws = try Recovery.restore(at: recoveryURL) }, message: "Recovery opened. Save a separate copy to keep it.", page: 0) }
+        case "discard": if confirm("Discard the local recovery copy?", "This removes only the app’s saved recovery file. The open working copy and your PDFs stay as they are.", action: "Discard recovery") { perform({ try Recovery.discard(at: recoveryURL) }, message: "Local recovery discarded. Further edits will create a new recovery copy while recovery is on.", storeRecovery: false) }
+        case "dark":
+            if edition.usesPipTheme {
+                colorMode = window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .light : .dark
+                UserDefaults.standard.set(colorMode.rawValue, forKey: "io.github.ghostzy0.paperwork.colorMode")
+                applyPipAppearance()
+            } else { window.appearance = NSAppearance(named: window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .aqua : .darkAqua) }
+        case "themePaper", "themeOat":
+            theme = action == "themeOat" ? .oat : .paper
+            UserDefaults.standard.set(theme.rawValue, forKey: "io.github.ghostzy0.paperwork.theme")
+            applyPipAppearance()
+        case "modeSystem", "modeLight", "modeDark":
+            colorMode = action == "modeLight" ? .light : (action == "modeDark" ? .dark : .system)
+            UserDefaults.standard.set(colorMode.rawValue, forKey: "io.github.ghostzy0.paperwork.colorMode")
+            applyPipAppearance()
+        case "pausePip": pipMark.isPaused.toggle(); pausePipItem?.state = pipMark.isPaused ? .on : .off
+        case "about": about()
+        case "more":
+            let menu = NSMenu(); for (title, key) in [("Insert or merge…", "insert"), ("Extract pages…", "extract"), ("Split into page files…", "split"), ("Optimise a copy…", "optimise"), ("Searchable scan copy…", "ocr"), ("Export text…", "text"), ("Export page image…", "image"), ("Flatten a copy…", "flatten"), ("About Paperwork", "about")] { let i = NSMenuItem(title: title, action: #selector(command(_:)), keyEquivalent: ""); i.target = self; i.representedObject = key; menu.addItem(i) }; if let b = sender as? NSButton { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: b.bounds.height), in: b) }
+        default: break
+        }
+    }
+    func openPicker() {
+        guard canLeave() else { return }; let p = NSOpenPanel(); p.allowedContentTypes = [.pdf]; p.allowsMultipleSelection = false
+        if p.runModal() == .OK, let url = p.url { openURL(url) }
+    }
+    func openURL(_ url: URL) {
+        do { let next = try Workspace.load(url); ws = next; reader.tool = "select"; refresh(page: 0); announce(next.readOnlyReason ?? "PDF opened. Your original is preserved.") } catch { showError(error) }
+    }
+    func save(options: [PDFDocumentWriteOption: Any] = [:], suffix: String = "edited", message: String? = nil, output: PDFDocument? = nil) {
+        guard let ws else { return }; if let message, !confirm("Save a separate \(suffix) copy?", message, action: "Choose destination") { return }
+        let p = NSSavePanel(); p.allowedContentTypes = [.pdf]; p.nameFieldStringValue = (ws.sourceURL?.deletingPathExtension().lastPathComponent ?? "Sample") + "-\(suffix).pdf"
+        if p.runModal() == .OK, let url = p.url {
+            // Create-only by design. Existing-file replacement is intentionally refused even if a picker offers it.
+            perform({ try ws.saveCopy(to: url, document: output, options: options) }, message: "Copy saved to \(url.lastPathComponent). Original preserved.")
+        }
+    }
+    func insert() {
+        let p = NSOpenPanel(); p.allowedContentTypes = [.pdf]; p.message = "Insert all pages after the current page. Your originals stay unchanged."
+        if p.runModal() == .OK, let url = p.url { perform({ let other = try Workspace.load(url); try ws?.insert(other, after: currentIndex) }) }
+    }
+    func extract() {
+        guard let ws, let value = input("Extract pages", message: "Enter pages such as 1-3, 5. The order you enter is preserved.", value: "\(currentIndex + 1)") else { return }
+        do { let indices = try Workspace.range(value, count: ws.document.pageCount); let pdf = try ws.extract(indices); save(suffix: "extracted", output: pdf) } catch { showError(error) }
+    }
+    func split() {
+        guard let ws else { return }
+        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true; panel.message = "Choose a folder. Separate page PDFs will be placed in a new subfolder."
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        perform({
+            let target = folder.appendingPathComponent("Paperwork-pages-" + String(UUID().uuidString.prefix(8)))
+            let staging = folder.appendingPathComponent(".paperwork-split-" + UUID().uuidString)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            defer { try? FileManager.default.removeItem(at: staging) }
+            for i in 0..<ws.document.pageCount { try ws.saveCopy(to: staging.appendingPathComponent(String(format: "Page-%04d.pdf", i + 1)), document: ws.extract([i])) }
+            try FileManager.default.moveItem(at: staging, to: target)
+        }, message: "Separate page copies saved in a new folder. Originals preserved.")
+    }
+    @objc func findText() {
+        guard let ws, !busy, !ws.document.isLocked else { return }
+        let query = search.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        matches = query.isEmpty ? [] : (reader.document?.findString(query, withOptions: .caseInsensitive) ?? []); matchIndex = 0
+        if matches.isEmpty { reader.clearSelection(); announce(query.isEmpty ? "Enter words to find in this PDF." : "No matches. Scanned pages may need a searchable copy.") } else { showMatch() }
+    }
+    func showMatch() { let selection = matches[matchIndex]; reader.setCurrentSelection(selection, animate: false); reader.go(to: selection); announce("Match \(matchIndex + 1) of \(matches.count). Use Command G for the next.") }
+    func addNote(_ page: PDFPage, _ point: NSPoint) {
+        guard let ws, let text = input("Sticky note", message: "Write a note for this page.") else { return }
+        perform({ try ws.annotate(.text, page: index(of: page), bounds: NSRect(x: point.x, y: point.y, width: 24, height: 24), text: text) })
+    }
+    func addInk(_ page: PDFPage, _ points: [NSPoint]) {
+        guard let ws, let first = points.first else { return }; var box = NSRect(origin: first, size: NSSize(width: 1, height: 1)); for p in points { box = box.union(NSRect(origin: p, size: NSSize(width: 1, height: 1))) }; box = box.insetBy(dx: -3, dy: -3)
+        perform({ try ws.annotate(.ink, page: index(of: page), bounds: box, points: points) })
+    }
+    func editForm(_ page: PDFPage, _ annotation: PDFAnnotation) {
+        guard let ws, ws.editable else { announce("This PDF is read-only."); return }
+        guard let annotationIndex = page.annotations.firstIndex(of: annotation), let corePage = ws.document.page(at: index(of: page)), corePage.annotations.indices.contains(annotationIndex) else { return }
+        let annotation = corePage.annotations[annotationIndex]
+        let value: String
+        if annotation.widgetFieldType == .button {
+            guard annotation.widgetControlType == .checkBoxControl || annotation.widgetControlType == .radioButtonControl else { announce("Form action buttons are disabled."); return }
+            let on = annotation.buttonWidgetStateString
+            guard confirm(annotation.fieldName ?? "Form choice", annotation.buttonWidgetState == .onState ? "Clear this form selection?" : "Select this form option?", action: annotation.buttonWidgetState == .onState ? "Clear selection" : "Select option") else { return }
+            value = annotation.buttonWidgetState == .onState ? "Off" : on
+        } else if annotation.widgetFieldType == .choice {
+            let choices = annotation.choices ?? []
+            guard !choices.isEmpty else { announce("This form has no available choices."); return }
+            let menu = NSMenu()
+            for choice in choices { let item = NSMenuItem(title: choice, action: #selector(formChoice(_:)), keyEquivalent: ""); item.target = self; item.representedObject = ["page": index(of: page), "annotation": annotationIndex, "value": choice] as [String: Any]; menu.addItem(item) }
+            menu.popUp(positioning: nil, at: NSPoint(x: reader.bounds.midX, y: reader.bounds.midY), in: reader); return
+        } else {
+            guard !annotation.isPasswordField else { announce("Password form fields are not stored here."); return }
+            guard let entered = input(annotation.fieldName ?? "Form field", message: "Your opened original stays unchanged.", value: annotation.widgetStringValue ?? "") else { return }
+            value = entered
+        }
+        perform({ try ws.fill(page: index(of: page), annotation: annotationIndex, value: value) })
+    }
+    @objc func formChoice(_ sender: NSMenuItem) {
+        guard let item = sender.representedObject as? [String: Any], let page = item["page"] as? Int, let annotation = item["annotation"] as? Int, let value = item["value"] as? String else { return }
+        perform({ try ws?.fill(page: page, annotation: annotation, value: value) })
+    }
+    @objc func inspectorAction(_ sender: NSButton) {
+        guard let ws, let page = ws.document.page(at: currentIndex), page.annotations.indices.contains(sender.tag) else { return }; let a = page.annotations[sender.tag]
+        if a.type == "Widget" { editForm(page, a) } else { perform({ try ws.removeAnnotation(page: currentIndex, annotation: sender.tag) }) }
+    }
+    func startOCR() {
+        guard let ws, confirm("Make a searchable scan copy?", "This uses on-device English recognition. Pages are flattened into images with invisible searchable text. Forms and annotations will no longer be editable. Recognition can make mistakes.", action: "Recognise text") else { return }
+        do {
+            let bytes = try ws.data(); let flag = CancellationFlag(); cancelFlag = flag; busy = true; progress.startAnimation(nil); controls["stop"]?.isHidden = false; refresh(); announce("Recognising text on this Mac.")
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let result = Result { try LocalOCR.searchableCopy(data: bytes, cancelled: { flag.isCancelled }, progress: { done, total in DispatchQueue.main.async { self?.status.stringValue = "Recognising page \(done) of \(total)." } }) }
+                DispatchQueue.main.async {
+                    guard let self else { return }; self.busy = false; self.cancelFlag = nil; self.progress.stopAnimation(nil); self.controls["stop"]?.isHidden = true; self.refresh()
+                    switch result { case .success(let pdf): if flag.isCancelled { self.announce("OCR stopped. Your working copy was kept."); return }; self.announce("Recognition finished. Choose where to save the searchable copy."); self.save(suffix: "searchable", output: pdf)
+                    case .failure(let error): self.showError(error) }
+                }
+            }
+        } catch { showError(error) }
+    }
+    func exportText() {
+        guard let ws else { return }; let p = NSSavePanel(); p.allowedContentTypes = [.plainText]; p.nameFieldStringValue = "Document.txt"
+        if p.runModal() == .OK, let url = p.url { perform({ guard !FileManager.default.fileExists(atPath: url.path) else { throw PaperworkError.invalid("Choose a new filename to preserve existing files.") }; try Workspace.writeNew(Data((ws.document.string ?? "").utf8), to: url) }, message: "Text exported. Scanned pages without OCR may have no text.") }
+    }
+    func exportImage() {
+        guard let page = ws?.document.page(at: currentIndex) else { return }; let p = NSSavePanel(); p.allowedContentTypes = [.png]; p.nameFieldStringValue = "Page-\(currentIndex + 1).png"
+        if p.runModal() == .OK, let url = p.url { perform({ let size = page.bounds(for: .mediaBox).size; guard size.width <= 2400, size.height <= 2400 else { throw PaperworkError.invalid("Extract a smaller page before exporting an image.") }; let img = page.thumbnail(of: NSSize(width: size.width * 2, height: size.height * 2), for: .mediaBox); guard let tiff = img.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { throw PaperworkError.invalid("The page image could not be prepared.") }; try Workspace.writeNew(png, to: url) }, message: "Page image exported.") }
+    }
+    func about() {
+        let alert = NSAlert(); alert.messageText = "\(edition.displayName) · 0.1.0-alpha.1"; alert.informativeText = "An original local PDF workspace by Ghostzy0.\n\nBuilt with Apple PDFKit and Vision. MIT app source. PDF Expert and Adobe Acrobat are independent workflow references; no affiliation.\n\nExperimental: supported forms only; no redaction, cryptographic signing or content-text replacement. OCR flattens pages. Encrypted and signed PDFs are read-only.\n\nSource and issue tracker: github.com/Ghostzy0/pip-paperwork"; alert.addButton(withTitle: "OK"); alert.beginSheetModal(for: window)
+    }
+    func pdfViewWillClick(onLink sender: PDFView, with url: URL) { announce("Links are inert in this local workspace. Copy a URL into your browser if you choose to visit it.") }
+    func pdfViewOpenPDF(_ sender: PDFView, forRemoteGoToAction action: PDFActionRemoteGoTo) { announce("Opening remote documents from a PDF is disabled.") }
+}
+
+let app = NSApplication.shared
+let delegate = PaperworkApp()
+app.delegate = delegate
+app.run()
