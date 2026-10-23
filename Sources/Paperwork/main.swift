@@ -5,6 +5,17 @@ import UniformTypeIdentifiers
 
 final class TopStackView: NSStackView { override var isFlipped: Bool { true } }
 
+// Modal NSAlert field editors may have no window undo manager. This editor owns only
+// the temporary input's typing history, never the PDF's document history.
+final class UndoInputTextView: NSTextView {
+    private let typingHistory = UndoManager()
+    var submit: (() -> Void)?
+    var cancel: (() -> Void)?
+    override var undoManager: UndoManager? { typingHistory }
+    override func insertNewline(_ sender: Any?) { submit?() }
+    override func cancelOperation(_ sender: Any?) { cancel?() }
+}
+
 final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDFViewDelegate, NSMenuItemValidation {
     var window: NSWindow!
     let reader = ReaderView()
@@ -191,6 +202,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     func announce(_ message: String) { status.stringValue = message; NSAccessibility.post(element: status, notification: .announcementRequested, userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.medium.rawValue]) }
     @objc func textEditingBegan(_ notification: Notification) {
+        guard !(notification.object is NSSecureTextField) else { return }
         // AppKit field editors default to no undo. Keep typing history separate from PDF history,
         // including editors inside modal form sheets rather than only the main search field.
         let editor = notification.userInfo?["NSFieldEditor"] as? NSTextView
@@ -206,9 +218,27 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     func input(_ title: String, message: String = "", value: String = "", secret: Bool = false) -> String? {
         let alert = NSAlert(); alert.messageText = title; alert.informativeText = message
-        let field: NSTextField = secret ? NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 28)) : NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 28))
-        field.stringValue = value; field.setAccessibilityLabel(title); alert.accessoryView = field; alert.addButton(withTitle: "Continue"); alert.addButton(withTitle: "Cancel"); alert.window.initialFirstResponder = field
-        return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
+        alert.addButton(withTitle: "Continue"); alert.addButton(withTitle: "Cancel")
+        if secret {
+            let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 28))
+            field.stringValue = value; field.setAccessibilityLabel(title); alert.accessoryView = field; alert.window.initialFirstResponder = field
+            return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
+        }
+        let editor = UndoInputTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 36))
+        editor.isRichText = false; editor.importsGraphics = false; editor.allowsUndo = true
+        editor.undoManager?.runLoopModes = [.default, .modalPanel]
+        editor.font = .systemFont(ofSize: 13); editor.string = value
+        editor.textContainerInset = NSSize(width: 6, height: 6)
+        editor.setAccessibilityLabel(title)
+        editor.submit = { [weak alert] in alert?.buttons.first?.performClick(nil) }
+        editor.cancel = { [weak alert] in alert?.buttons.last?.performClick(nil) }
+        alert.accessoryView = editor; alert.window.initialFirstResponder = editor
+        return alert.runModal() == .alertFirstButtonReturn ? editor.string : nil
+    }
+    func focusedTextEditor() -> NSTextView? {
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView,
+              editor.isEditable, editor.isFieldEditor || editor is UndoInputTextView else { return nil }
+        return editor
     }
     func refresh(page: Int? = nil) {
         let index = page ?? currentIndex
@@ -246,7 +276,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let action = item.representedObject as? String ?? ""
-        if action == "undo" || action == "redo", let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor {
+        if action == "undo" || action == "redo", let editor = focusedTextEditor() {
             item.title = action == "undo" ? "Undo typing" : "Redo typing"
             return action == "undo" ? (editor.undoManager?.canUndo ?? false) : (editor.undoManager?.canRedo ?? false)
         }
@@ -296,7 +326,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     @objc func command(_ sender: Any) {
         let action = (sender as? NSMenuItem)?.representedObject as? String ?? (sender as? NSButton)?.identifier?.rawValue ?? ""
-        if sender is NSMenuItem, action == "undo" || action == "redo", let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor {
+        if sender is NSMenuItem, action == "undo" || action == "redo", let editor = focusedTextEditor() {
             if action == "undo", editor.undoManager?.canUndo == true { editor.undoManager?.undo() }
             if action == "redo", editor.undoManager?.canRedo == true { editor.undoManager?.redo() }
             return
