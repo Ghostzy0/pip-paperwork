@@ -456,13 +456,51 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertEqual(progress, 0)
         XCTAssertThrowsError(try LocalOCR.searchableCopy(data: Data("invalid".utf8)))
     }
+    func testOCRRecognitionLanguagesAreOrderedUniqueAndCompatible() throws {
+        let supported = ["en-GB", "en-US", "fr-FR", "zh-Hans", "zh-Hant"]
+        XCTAssertEqual(try LocalOCR.validateRecognitionLanguages(["fr-FR", "en-GB"], supportedBy: supported), ["fr-FR", "en-GB"])
+        XCTAssertEqual(try LocalOCR.validateRecognitionLanguages(["zh-Hant", "en-GB"], supportedBy: supported), ["zh-Hant", "en-GB"])
+        XCTAssertEqual(try LocalOCR.validateRecognitionLanguages(["zh-Hans"], supportedBy: supported), ["zh-Hans"])
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages([], supportedBy: supported), "At least one language is required")
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages(["  "], supportedBy: supported), "Blank language codes are invalid")
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages(["en-GB", "en-GB"], supportedBy: supported), "Selections must be unique")
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages(["de-DE"], supportedBy: supported), "Unsupported languages are rejected")
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages(["en-GB", "zh-Hant"], supportedBy: supported), "Chinese must be first")
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages(["zh-Hant", "fr-FR"], supportedBy: supported), "Chinese may only be paired with English")
+        XCTAssertThrowsError(try LocalOCR.validateRecognitionLanguages(["zh-Hant", "zh-Hans"], supportedBy: supported), "Two Chinese variants are incompatible")
+    }
+    func testOCRCoreDefaultDoesNotDependOnVisionAdvertisedLanguages() throws {
+        var queriedVision = false
+        let coreLanguages = try LocalOCR.resolveRecognitionLanguages(nil) {
+            queriedVision = true
+            return ["en-US", "fr-FR"] // This Vision runtime omits legacy en-GB.
+        }
+        XCTAssertEqual(coreLanguages, ["en-GB"])
+        XCTAssertFalse(queriedVision, "Core must preserve its accepted historical request without listing languages")
+
+        XCTAssertThrowsError(try LocalOCR.resolveRecognitionLanguages(["en-GB"], supportedLanguages: {
+            queriedVision = true
+            return ["en-US", "fr-FR"]
+        }), "Explicit Plus selections must still be validated against this runtime")
+        XCTAssertTrue(queriedVision)
+    }
+    func testOCRRejectsUnsupportedLanguageBeforeParsingOrReportingProgress() throws {
+        let unavailable = "paperwork-unavailable-\(UUID().uuidString)"
+        var progress = 0
+        XCTAssertThrowsError(try LocalOCR.searchableCopy(data: Data("invalid PDF".utf8), progress: { _, _ in progress += 1 }, recognitionLanguages: [unavailable])) { error in
+            XCTAssertTrue(error.localizedDescription.contains("not supported"), error.localizedDescription)
+        }
+        XCTAssertEqual(progress, 0)
+    }
     func testOCRCancellationAfterFirstPageReturnsNoPartialDocument() throws {
         let bytes = try Data(contentsOf: fixtures.appendingPathComponent("three-pages.pdf"))
         let flag = CancellationFlag()
         var completed: [Int] = []
-        XCTAssertThrowsError(try LocalOCR.searchableCopy(data: bytes, cancelled: { flag.isCancelled }, progress: { current, total in
+        var output: PDFDocument?
+        XCTAssertThrowsError(try output = LocalOCR.searchableCopy(data: bytes, cancelled: { flag.isCancelled }, progress: { current, total in
             XCTAssertEqual(total, 3); completed.append(current); flag.cancel()
         }))
+        XCTAssertNil(output, "Cancellation must not return a partial searchable copy")
         XCTAssertEqual(completed, [1])
     }
     func testOCRRejectsOversizedPageWithoutCallingProgress() throws {
@@ -511,5 +549,18 @@ final class WorkspaceTests: XCTestCase {
         try XCTUnwrap(recognised.dataRepresentation()).write(to: url)
         XCTAssertTrue((PDFDocument(url: url)?.string ?? "").contains("SYNTHETIC"))
         try output(url, name: "ocr-searchable.pdf")
+    }
+    func testSearchableFrenchOCRContainsRecognisedTextWhenSupported() throws {
+        let supported = try LocalOCR.supportedRecognitionLanguages()
+        guard supported.contains("fr-FR") else { throw XCTSkip("French OCR is not supported by this macOS Vision request.") }
+
+        let image = NSImage(size: NSSize(width: 800, height: 1000))
+        image.lockFocus()
+        NSColor.white.setFill(); NSRect(x: 0, y: 0, width: 800, height: 1000).fill()
+        NSAttributedString(string: "BONJOUR FRANCAIS 731", attributes: [.font: NSFont.systemFont(ofSize: 38), .foregroundColor: NSColor.black]).draw(at: NSPoint(x: 50, y: 800))
+        image.unlockFocus()
+        let scan = PDFDocument(); scan.insert(try XCTUnwrap(PDFPage(image: image)), at: 0)
+        let recognised = try LocalOCR.searchableCopy(data: XCTUnwrap(scan.dataRepresentation()), recognitionLanguages: ["fr-FR"])
+        XCTAssertTrue((recognised.string ?? "").contains("BONJOUR"), recognised.string ?? "no recognised text")
     }
 }

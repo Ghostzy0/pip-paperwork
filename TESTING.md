@@ -1,36 +1,44 @@
 # Testing and evidence
 
-23 October 2026. Experimental qualification in progress. Custom source is public, with no downloadable binary or full reference parity claim. The corrected canonical starter passes 32 native cases on macOS 14 CI and local macOS 27, and its actual packaged save/reopen passed. Modal input typing Undo remains open until the newest fix is retested; Pip UX, Plus and reference fidelity remain pending.
+24 October 2026. Experimental source; no published binary or full reference-parity claim. Core/Pip share one document engine; Plus adds a runtime-supported OCR language picker and inspector collapse. The focused public modal Undo fix passed its exact-head native retest. Latest Plus/Pip skin, feature and release qualification remains pending.
 
-## Executed baseline checks
+## Current local run
 
-Independent functionality review exercised the shared native engine on Apple silicon with macOS 27 / Swift 6.4. The latest repaired baseline passed **31 XCTest cases**, **7 Go helper tests**, and **8 independent pypdf groups**. These include source/alias preservation, create-only output, annotation and canonical form persistence, undo/redo, page operations, extraction, explicit flattening, encrypted/signature-marker policy, recovery and bounded searchable OCR. The production starter now has its own regression: search, highlight, text-field edit, page rotation, save and reopen. The packaged executable tested by the reviewer has SHA-256 `371eefab9453509b3c151160291f2de4b42d5fcc0042fcb654eadae96fbbc670`.
+The current shared engine passed **36 XCTest cases, zero failures**, in2.218seconds on Apple silicon/macOS27. Both formerly failing OCR cases now pass: the historical Core en-GB request remains independent of Vision’s advertised language list, and cancellation after page1 returns no partial PDF. A new focused regression proves Core does not query that list while explicit Plus selections still validate it. The French scanned-token case ran and passed on this host; that single clean fixture is not an accuracy benchmark or a claim for every language.
 
-These checks exposed and repaired real PDFKit serialization defects: stale checkbox/radio values and appearance states, missing embedded-font stream lengths, lost field trees after extraction, a hidden form tree after flattening, and the starter's orphan text widget. Independent Poppler renders of the corrected synthetic outputs emitted no PDF warnings. This is bounded corpus evidence, not universal PDF compatibility.
+All four source variants built and passed strict local ad-hoc signature checks. Parent checks confirmed distinct edition/bundle/data/version identities, matching original icon/starter resources and no tested private-home-path markers in stripped executables. Core version0.1.0-alpha.1; Plus0.2.0-alpha.1. These are local package results, not downloadable release receipts or notarisation.
 
-Independent Luna hands-on review of that exact repaired baseline completed: synthetic save/reopen retained the form value, highlight and second-page rotation, and save cancellation preserved the working copy. R2 FAILED overall because Cmd+Z in Find changed document data rather than the focused query; the form editor also lacked typing undo. Source routing/field-editor undo fixes need a newly identified packaged retest. Earlier native interaction found and corrected inspector alignment, page position after undo, and inline widget edits bypassing the controlled editor. A later walkthrough caught the starter failure and reopened acceptance despite the earlier passing fixtures. Pip appearance source subsequently compiled, packaged and passed the same 31 native tests (2.275 seconds); its executable SHA-256 is `b734fbe53aac723b9428f39ae35f9dcb531aa0e7aef6273385c10e5b193a3c54`. This is source/package regression evidence; actual Pip GUI acceptance and all Plus packages remain pending.
+Package identities and full artifact checksums are recorded in the version-specific release/audit receipts. No binary release is currently published; hashes from an earlier build must not be treated as a current download checksum.
+
+## Native finding and current fix
+
+Earlier actual packaged testing found Command-Z in Find could change PDF data. Search typing Undo/Redo and document Undo/Redo routing subsequently passed separately. Modal form typing Undo still failed on the previous package despite a dedicated native undo manager. A headless AppKit probe proved native text history registration and direct undo/redo work; this did not reproduce a visible modal event loop.
+
+The newest fix temporarily routes the modal’s Undo/Redo menu actions through native nil-target responder-chain dispatch and restores document routing on exit. Independent actual keyboard/menu testing passed on public Core head81f0df0552264a33db6a3768758db410f26ae8eb, executable5a5165a6e9faf5a92e23c254245a3deb81f7509c9d5a13dd63131a9b674b6672: modal Undo/Redo, submit/cancel, Find history and document history stayed separate. Earlier failures remain in the audit history. This is scoped fix acceptance; current Plus/Pip/AT and release qualification is separate. Screenshots appeared inline but were not saved as local PNG files in that retest.
+
+Actual earlier synthetic save/reopen retained three pages, the edited contact, highlight and page rotation; save cancellation preserved the working copy. The canonical bundled starter also saved and reopened with its edited field. Those are bounded identified-package observations, not acceptance of the newest packages or arbitrary PDFs.
+
+## Cross-OS and independent checks
+
+Previous independent reviews exercised seven Go helper tests and eight pypdf output groups, including canonical form/button state, page operations, flattening, protected inputs/aliases and create-only saves. Newly changed OCR/UI code has a separate source review with no confirmed critical/high defect; native verification remains separate.
+
+The first hosted macOS14 run39890474271 failed on a programmatic starter font defect and a legitimate ancillary Popup assertion. The corrected canonical starter and annotation assertions passed32nativecases plus Go tests and both Core packages in [run39891343307](https://github.com/Ghostzy0/pip-paperwork/actions/runs/39891343307). Public Plus head3cbe9994f685b5e613ad38c992dc31359dfc7322 passed36cases and all four builds in [macOS14 run40117568228](https://github.com/Ghostzy0/pip-paperwork/actions/runs/40117568228). Minimum-version GUI acceptance remains unverified.
 
 ## Reproduce
 
-From the app directory internally, or the root of the standalone export:
+From the standalone root:
 
 ```sh
 ./scripts/test.sh
 ./.build-tools/go/bin/go -C Engine test -p 2 ./...
 ./scripts/build.sh baseline
 ./scripts/build.sh pip
+./scripts/build.sh baseline-plus
+./scripts/build.sh pip-plus
 ```
 
-The build script downloads a checksum-pinned Go toolchain and locked modules at build time. The packaged app requires neither Go nor Python. Public fixture passwords are synthetic constants, not credentials. See the fixture README for regeneration and independent output verification. The helper tests and native tests require the pinned helper to have been built first, as the test script does.
+The build downloads a checksum-pinned Go toolchain and locked modules. Runtime needs neither Go nor Python. Fixture passwords are public synthetic test values. Regeneration/independent checks are documented in the fixture README.
 
-## Remaining evidence
+## Pending
 
-Actual final baseline/Pip GUI save/reopen, Paper/dark/Oat and minimum-window checks, keyboard focus/undo, recovery discard wrapper and export permissions still need their final native review. The reference installer and signed vendor package have been inspected; reference workflow observation remains pending free installation. Native VoiceOver, large-document responsiveness/peak RSS, macOS 14 runtime, Intel, genuine cryptographic signatures and notarisation remain unverified. Signature fixtures check conservative handling only. Ad-hoc code-sign verification is package integrity evidence, not Developer ID signing or notarisation.
-
-## Cross-OS CI correction in progress
-
-The first public macOS14 run39890474271 failed the exact programmatic tutorial starter because its orphan widget font could not be resolved; it also exposed a legitimate Popup companion to a Text annotation. Current source uses an original canonical three-page starter asset with a real field tree and reproducible generator. The packager copies the same asset to Resources, tests inject its source location into the production loader, and missing-resource failure is tested. Optional Popup is validated against its Text parent while all five logical markup/type/content/ink/remove/undo assertions remain. No helper safety policy is relaxed.
-
-On macOS27, the revised32-case native suite passed3.446seconds and both stripped Core packages built/signed. Hosted macOS14 rerun, actual final bundled sample and modal typing undo need retesting; a local repair is not yet a hosted pass or oldest-OS GUI acceptance.
-
-The canonical-starter correction passed hosted macOS 14 [run39891343307](https://github.com/Ghostzy0/pip-paperwork/actions/runs/39891343307):32nativecases,Go tests andbothCorepackages/strictsignatures. The latestactualNeutralCorestarter saved and reopened three pages with the edited contact. This closes the scoped starter/platform defect, not modaltypingUndo or completeGUI/minimumOS coverage.
+Latest Plus/Pip native acceptance; actual Paper/Oat/dark, keyboard/window/accessibility/reduced-motion checks; Plus language-picker/cancel and inspector-width/focus checks; representative CPU/RSS/latency; actual PDF Expert workflow/layout comparison; final public clean-clone builds and package review. Minimum-macOS GUI, VoiceOver, large-document responsiveness, Intel, genuine cryptographic signatures and notarisation are unverified. Ad-hoc signatures establish local package integrity only.

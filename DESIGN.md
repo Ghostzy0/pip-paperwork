@@ -17,3 +17,5 @@
 - AppKit's menus, alerts, fields, PDF selection and native panels remain the interaction layer. Command-Z/Shift-Command-Z in a text field routes to the field editor's undo manager; elsewhere the existing document undo stack remains active.
 
 Pending: actual baseline/Pip renders, normal/dark/Oat and window-size checks, keyboard/VoiceOver evidence, independent Pip UI review/fix/retest, and compilation of the current source. No runtime or accessibility acceptance is claimed from these source changes.
+
+Enabled secondary Pip button outlines now composite the secondary ink at75% over the canvas. Source colour calculations give3.98:1 Paper light,4.71:1 Paper dark,3.47:1 Oat light and5.32:1 Oat dark; the former35% treatment failed the control contrast target. These calculations do not replace native pixel/focus/window review. Disabled controls remain visually subdued.
