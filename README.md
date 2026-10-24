@@ -34,6 +34,10 @@ A local build is ad-hoc signed, not Developer ID signed or notarised. For a down
 
 [How to read, annotate and save](docs/HOW-TO.md) · [FAQ](docs/FAQ.md) · [AI setup prompt and verification](docs/AI-SETUP.md) · [Privacy and storage](docs/PRIVACY.md) · [Provenance](UPSTREAM.md) · [Known gaps](PARITY.md) · [Change notes](CHANGELOG.md)
 
+## Shared engine identity
+
+`SHARED-CORE.sha256` records the PDF/OCR/recovery/sample engine and canonical-writer sources shared by the configurations. Verify it from the repository root with `shasum -a 256 -c SHARED-CORE.sha256`. The separate recreation repository must preserve or explicitly explain this source pin; matching hashes do not establish functional or visual parity.
+
 ## File safety and limits
 
 The opened PDF is treated as the protected original. Save requires a new `.pdf` filename; existing files, aliases and hardlinks are refused. To revise an earlier export, reopen it and save under another name. Normal saves retain editable annotations/forms where PDFKit supports them. Flattening and OCR are separate exports and lose editable annotations/form controls. Optimisation may change image detail and may not reduce size.

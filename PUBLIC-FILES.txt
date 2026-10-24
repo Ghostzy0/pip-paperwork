@@ -42,7 +42,6 @@ scripts/test.sh
 Engine/build.sh
 Engine/main.go
 Engine/main_test.go
-Engine/verify_integration.py
 Engine/go.mod
 Engine/go.sum
 Engine/README.md
@@ -69,3 +68,4 @@ assets/AppIcon-Baseline.icns
 assets/AppIcon-Pip.icns
 assets/previews/AppIcon-Baseline-preview.png
 assets/previews/AppIcon-Pip-preview.png
+SHARED-CORE.sha256

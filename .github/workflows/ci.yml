@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify shared engine source pin
+        run: shasum -a 256 -c SHARED-CORE.sha256
       - name: Test canonical writer and native core
         run: |
           ./scripts/test.sh
