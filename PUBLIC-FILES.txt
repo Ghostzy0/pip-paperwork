@@ -64,3 +64,8 @@ Engine/Notices/yaml-LICENSE.txt
 Engine/.gitignore
 Sources/PaperworkCore/Resources/starter.pdf
 Tests/PaperworkCoreTests/Fixtures/generate_starter.py
+assets/generate_icons.py
+assets/AppIcon-Baseline.icns
+assets/AppIcon-Pip.icns
+assets/previews/AppIcon-Baseline-preview.png
+assets/previews/AppIcon-Pip-preview.png

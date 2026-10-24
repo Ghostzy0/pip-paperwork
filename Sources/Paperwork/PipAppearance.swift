@@ -9,7 +9,11 @@ enum PaperworkEdition: String {
 
     var usesPipTheme: Bool { self == .pip || self == .pipPlus }
     var hasPlusFeatures: Bool { self == .baselinePlus || self == .pipPlus }
-    var displayName: String { usesPipTheme ? "Pip Paperwork" : "Paperwork Baseline" }
+    var displayName: String {
+        if hasPlusFeatures { return usesPipTheme ? "Pip Paperwork Plus" : "Paperwork Plus" }
+        return usesPipTheme ? "Pip Paperwork" : "Paperwork Baseline"
+    }
+    var releaseVersion: String { hasPlusFeatures ? "0.2.0-alpha.1" : "0.1.0-alpha.1" }
     var defaultDataDirectory: String {
         switch self {
         case .baseline: "PaperworkBaseline"

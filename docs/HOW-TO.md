@@ -12,6 +12,8 @@ Paperwork keeps the opened input as the protected original. Begin with **Open sa
 
 **Searchable scan copy** recognises English using on-device Vision. It creates a flattened output, so keep the editable original. Stop requests cancellation of recognition; no partial document should be saved. **Flatten a copy** paints annotations/forms into page content, while **Optimise a copy** may reduce image detail and may not make the file smaller.
 
+In Plus, Searchable scan first asks for one main language from the current Mac’s supported list. Canceling that chooser starts no OCR. Core continues its English request. Plus also offers Hide inspector/Show inspector in the toolbar and View menu; restore it to edit form fields or annotations. These controls remain in native qualification.
+
 Recovery is off by default. Enable it in File only if you want a local document-content snapshot. Restore opens a detached working copy; save it separately. Discard removes the stored recovery file, while later edits can create another if recovery remains on.
 
 Current limits and verification gaps are in [TESTING](../TESTING.md) and [PARITY](../PARITY.md). The [FAQ](FAQ.md) explains why restricted/signed/encrypted inputs are protected.

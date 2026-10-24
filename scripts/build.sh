@@ -4,10 +4,14 @@ cd "$(dirname "$0")/.."
 [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || { echo "This build supports Apple silicon macOS only"; exit 2; }
 edition="${1:-baseline}"
 case "$edition" in
-  baseline) name='Paperwork Baseline'; identifier='io.github.ghostzy0.paperwork.baseline'; data_directory='PaperworkBaseline';;
-  pip) name='Pip Paperwork'; identifier='io.github.ghostzy0.paperwork'; data_directory='PipPaperwork';;
-  *) echo 'Use baseline or pip. Plus packages are not qualified yet.'; exit 2;;
+  baseline) name='Paperwork Baseline'; identifier='io.github.ghostzy0.paperwork.baseline'; data_directory='PaperworkBaseline'; icon='AppIcon-Baseline.icns';;
+  pip) name='Pip Paperwork'; identifier='io.github.ghostzy0.paperwork'; data_directory='PipPaperwork'; icon='AppIcon-Pip.icns';;
+  baseline-plus) name='Paperwork Plus'; identifier='io.github.ghostzy0.paperwork.baseline.plus'; data_directory='PaperworkCorePlus'; icon='AppIcon-Baseline.icns';;
+  pip-plus) name='Pip Paperwork Plus'; identifier='io.github.ghostzy0.paperwork.plus'; data_directory='PipCorePlus'; icon='AppIcon-Pip.icns';;
+  *) echo 'Use baseline, pip, baseline-plus or pip-plus.'; exit 2;;
 esac
+version='0.1.0'; release_version='0.1.0-alpha.1'
+if [[ "$edition" == *-plus ]]; then version='0.2.0'; release_version='0.2.0-alpha.1'; fi
 ./Engine/build.sh
 swift build -c release --jobs 2
 app="build/$name.app"
@@ -23,12 +27,13 @@ if LC_ALL=C grep -aqE '(/Users/|/home/)' "$app/Contents/MacOS/Paperwork"; then
 fi
 cp LICENSE "$app/Contents/Resources/LICENSE"
 cp Sources/PaperworkCore/Resources/starter.pdf "$app/Contents/Resources/starter.pdf"
+cp "assets/$icon" "$app/Contents/Resources/AppIcon.icns"
 cp -R Engine/Notices "$app/Contents/Resources/ThirdPartyNotices"
 cp Engine/build/canonical-pdf "$app/Contents/Resources/canonical-pdf"
 codesign --force --sign - "$app/Contents/Resources/canonical-pdf"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>$identifier</string><key>CFBundleName</key><string>$name</string><key>CFBundleDisplayName</key><string>$name</string><key>CFBundleExecutable</key><string>Paperwork</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>0.1.0</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>14.0</string><key>NSHighResolutionCapable</key><true/><key>PaperworkEdition</key><string>$edition</string><key>PaperworkReleaseVersion</key><string>0.1.0-alpha.1</string><key>PaperworkDataDirectory</key><string>$data_directory</string><key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeName</key><string>PDF document</string><key>CFBundleTypeRole</key><string>Viewer</string><key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array></dict></array></dict></plist>
+<key>CFBundleIdentifier</key><string>$identifier</string><key>CFBundleName</key><string>$name</string><key>CFBundleDisplayName</key><string>$name</string><key>CFBundleExecutable</key><string>Paperwork</string><key>CFBundleIconFile</key><string>AppIcon</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>$version</string><key>CFBundleVersion</key><string>1</string><key>LSMinimumSystemVersion</key><string>14.0</string><key>NSHighResolutionCapable</key><true/><key>PaperworkEdition</key><string>$edition</string><key>PaperworkReleaseVersion</key><string>$release_version</string><key>PaperworkDataDirectory</key><string>$data_directory</string><key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeName</key><string>PDF document</string><key>CFBundleTypeRole</key><string>Viewer</string><key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array></dict></array></dict></plist>
 PLIST
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
