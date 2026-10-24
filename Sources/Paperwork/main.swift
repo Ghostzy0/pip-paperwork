@@ -236,6 +236,22 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         editor.setAccessibilityLabel(title)
         editor.submit = { [weak alert] in alert?.buttons.first?.performClick(nil) }
         editor.cancel = { [weak alert] in alert?.buttons.last?.performClick(nil) }
+        let undoItems = NSApp.mainMenu?.items.first(where: { $0.submenu?.title == "Edit" })?.submenu?.items.filter {
+            let action = $0.representedObject as? String
+            return action == "undo" || action == "redo"
+        } ?? []
+        let originalUndoRouting = undoItems.map { ($0, $0.action, $0.target, $0.title) }
+        for item in undoItems {
+            let action = item.representedObject as? String
+            item.title = action == "undo" ? "Undo typing" : "Redo typing"
+            item.action = Selector(action == "undo" ? "undo:" : "redo:")
+            item.target = nil
+        }
+        defer {
+            for (item, action, target, title) in originalUndoRouting {
+                item.action = action; item.target = target; item.title = title
+            }
+        }
         alert.accessoryView = editor; alert.window.initialFirstResponder = editor
         defer {
             editor.undoManager?.removeAllActions()
