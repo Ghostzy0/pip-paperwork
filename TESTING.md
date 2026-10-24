@@ -1,6 +1,6 @@
 # Testing and evidence
 
-23 October 2026. Experimental qualification in progress. No public release or full reference parity is claimed.
+23 October 2026. Experimental qualification in progress. Custom source is public, with no downloadable binary or full reference parity claim. The corrected canonical starter passes 32 native cases on macOS 14 CI and local macOS 27, and its actual packaged save/reopen passed. Modal input typing Undo remains open until the newest fix is retested; Pip UX, Plus and reference fidelity remain pending.
 
 ## Executed baseline checks
 
@@ -26,3 +26,11 @@ The build script downloads a checksum-pinned Go toolchain and locked modules at 
 ## Remaining evidence
 
 Actual final baseline/Pip GUI save/reopen, Paper/dark/Oat and minimum-window checks, keyboard focus/undo, recovery discard wrapper and export permissions still need their final native review. The reference installer and signed vendor package have been inspected; reference workflow observation remains pending free installation. Native VoiceOver, large-document responsiveness/peak RSS, macOS 14 runtime, Intel, genuine cryptographic signatures and notarisation remain unverified. Signature fixtures check conservative handling only. Ad-hoc code-sign verification is package integrity evidence, not Developer ID signing or notarisation.
+
+## Cross-OS CI correction in progress
+
+The first public macOS14 run39890474271 failed the exact programmatic tutorial starter because its orphan widget font could not be resolved; it also exposed a legitimate Popup companion to a Text annotation. Current source uses an original canonical three-page starter asset with a real field tree and reproducible generator. The packager copies the same asset to Resources, tests inject its source location into the production loader, and missing-resource failure is tested. Optional Popup is validated against its Text parent while all five logical markup/type/content/ink/remove/undo assertions remain. No helper safety policy is relaxed.
+
+On macOS27, the revised32-case native suite passed3.446seconds and both stripped Core packages built/signed. Hosted macOS14 rerun, actual final bundled sample and modal typing undo need retesting; a local repair is not yet a hosted pass or oldest-OS GUI acceptance.
+
+The canonical-starter correction passed hosted macOS 14 [run39891343307](https://github.com/Ghostzy0/pip-paperwork/actions/runs/39891343307):32nativecases,Go tests andbothCorepackages/strictsignatures. The latestactualNeutralCorestarter saved and reopened three pages with the edited contact. This closes the scoped starter/platform defect, not modaltypingUndo or completeGUI/minimumOS coverage.
