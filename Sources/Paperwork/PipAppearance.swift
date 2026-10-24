@@ -161,7 +161,7 @@ final class PipActionButton: NSButton {
         let ink = isEnabled ? palette.ink : palette.secondary
         layer?.backgroundColor = (primary ? palette.ink : palette.canvas).cgColor
         layer?.borderWidth = primary ? 0 : 1
-        layer?.borderColor = palette.secondary.withAlphaComponent(0.35).cgColor
+        layer?.borderColor = palette.secondary.withAlphaComponent(0.75).cgColor
         let color = primary ? palette.canvas : ink
         attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: NSFont.systemFont(ofSize: 13, weight: .medium)])
         alphaValue = isEnabled ? 1 : 0.55
