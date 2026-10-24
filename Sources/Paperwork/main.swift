@@ -124,6 +124,13 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     func button(_ title: String, _ action: String) -> NSButton {
         let b: NSButton = edition.usesPipTheme ? PipActionButton(title: title, target: self, action: #selector(command(_:))) : NSButton(title: title, target: self, action: #selector(command(_:))); if let pip = b as? PipActionButton { pip.primary = action == "save" }; b.identifier = .init(action); b.bezelStyle = .rounded; b.setAccessibilityLabel(title); b.toolTip = title; controls[action] = b; return b
     }
+    func updateButtonStates(in view: NSView?) {
+        guard let view, !(view is PDFView), !(view is PDFThumbnailView) else { return }
+        if let button = view as? NSButton, let action = button.identifier?.rawValue, controls[action] != nil {
+            button.isEnabled = enabled(action)
+        }
+        for child in view.subviews { updateButtonStates(in: child) }
+    }
     func row(_ views: [NSView], spacing: CGFloat = 8) -> NSStackView { let stack = NSStackView(views: views); stack.orientation = .horizontal; stack.spacing = spacing; stack.alignment = .centerY; return stack }
     func column(_ views: [NSView], spacing: CGFloat = 12) -> NSStackView { let stack = NSStackView(views: views); stack.orientation = .vertical; stack.spacing = spacing; stack.alignment = .leading; return stack }
     func setupWindow() {
@@ -286,7 +293,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
             if let p = reader.document?.page(at: min(max(0, index), max(0, ws.document.pageCount - 1))) { reader.go(to: p) }
         } else { detail.stringValue = "Local PDF workspace" }
         reader.interactionEnabled = !busy
-        for (action, b) in controls { b.isEnabled = enabled(action) }
+        updateButtonStates(in: contentView)
         pageChanged(); updateInspector()
     }
     func enabled(_ action: String) -> Bool {
@@ -336,13 +343,13 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
                 let title = a.type == "Widget" ? (a.fieldName ?? "Form field") : (a.type ?? "Annotation")
                 inspector.addArrangedSubview(label(title, weight: .semibold))
                 inspector.addArrangedSubview(label(a.widgetStringValue ?? a.contents ?? "", secondary: true))
-                let action = NSButton(title: a.type == "Widget" ? "Edit field…" : "Remove annotation", target: self, action: #selector(inspectorAction(_:))); action.tag = i; action.isEnabled = ws.editable; inspector.addArrangedSubview(action)
+                let action = NSButton(title: a.type == "Widget" ? "Edit field…" : "Remove annotation", target: self, action: #selector(inspectorAction(_:))); action.tag = i; action.isEnabled = ws.editable && !busy; inspector.addArrangedSubview(action)
             }
         }
         inspector.addArrangedSubview(label("Your original stays unchanged. Save a copy to keep these edits.", size: 12, secondary: true))
         inspector.addArrangedSubview(button("Insert or merge…", "insert")); inspector.addArrangedSubview(button("Extract pages…", "extract")); inspector.addArrangedSubview(button("Searchable scan…", "ocr"))
         inspector.addArrangedSubview(label(recoveryEnabled ? "Recovery is on. A private local copy is kept after each edit." : "Recovery is off. Enable it in File to keep an editable local snapshot.", size: 12, secondary: true))
-        for (action, b) in controls { b.isEnabled = enabled(action) }
+        updateButtonStates(in: contentView)
         updatePipColors()
     }
     func perform(_ body: () throws -> Void, message: String = "Working copy updated. Save a copy to keep it.", page: Int? = nil, storeRecovery: Bool = true) {
@@ -477,14 +484,17 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     func showMatch() { let selection = matches[matchIndex]; reader.setCurrentSelection(selection, animate: false); reader.go(to: selection); announce("Match \(matchIndex + 1) of \(matches.count). Use Command G for the next.") }
     func addNote(_ page: PDFPage, _ point: NSPoint) {
+        guard !busy else { return }
         guard let ws, let text = input("Sticky note", message: "Write a note for this page.") else { return }
         perform({ try ws.annotate(.text, page: index(of: page), bounds: NSRect(x: point.x, y: point.y, width: 24, height: 24), text: text) })
     }
     func addInk(_ page: PDFPage, _ points: [NSPoint]) {
+        guard !busy else { return }
         guard let ws, let first = points.first else { return }; var box = NSRect(origin: first, size: NSSize(width: 1, height: 1)); for p in points { box = box.union(NSRect(origin: p, size: NSSize(width: 1, height: 1))) }; box = box.insetBy(dx: -3, dy: -3)
         perform({ try ws.annotate(.ink, page: index(of: page), bounds: box, points: points) })
     }
     func editForm(_ page: PDFPage, _ annotation: PDFAnnotation) {
+        guard !busy else { return }
         guard let ws, ws.editable else { announce("This PDF is read-only."); return }
         guard let annotationIndex = page.annotations.firstIndex(of: annotation), let corePage = ws.document.page(at: index(of: page)), corePage.annotations.indices.contains(annotationIndex) else { return }
         let annotation = corePage.annotations[annotationIndex]
@@ -508,11 +518,12 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         perform({ try ws.fill(page: index(of: page), annotation: annotationIndex, value: value) })
     }
     @objc func formChoice(_ sender: NSMenuItem) {
+        guard !busy else { return }
         guard let item = sender.representedObject as? [String: Any], let page = item["page"] as? Int, let annotation = item["annotation"] as? Int, let value = item["value"] as? String else { return }
         perform({ try ws?.fill(page: page, annotation: annotation, value: value) })
     }
     @objc func inspectorAction(_ sender: NSButton) {
-        guard let ws, let page = ws.document.page(at: currentIndex), page.annotations.indices.contains(sender.tag) else { return }; let a = page.annotations[sender.tag]
+        guard !busy, let ws, let page = ws.document.page(at: currentIndex), page.annotations.indices.contains(sender.tag) else { return }; let a = page.annotations[sender.tag]
         if a.type == "Widget" { editForm(page, a) } else { perform({ try ws.removeAnnotation(page: currentIndex, annotation: sender.tag) }) }
     }
     func chooseOCRLanguage() throws -> [String]? {

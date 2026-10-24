@@ -6,6 +6,8 @@ New: reader/thumbnails/search/text selection, editable markup/notes/freehand, su
 
 Fixes during qualification: protected recovery from overwriting input aliases, removed output replacement races, marked restored-only work unsaved, and stopped OCR from opening a save flow after cancellation.
 
+Unreleased busy-state correction updates all copies of app toolbar actions and refuses inspector/form/note/ink callbacks during OCR. Independent source review passed; exact rebuilt native busy/Stop verification remains pending. Earlier355390f Pip palette/search observations are separately identified in TESTING and do not qualify this later source change.
+
 Limits: no real redaction, certificate signing/validation, PDF content-text replacement, Office conversion or cloud document help. OCR recognition can be wrong and rasterises pages; review every output. Form and PDF structures are not universally compatible. Encrypted/restricted/signed documents are read-only. Input/OCR resource limits and create-only saves are deliberate safety boundaries.
 
 Binary signing, architecture, tested OS, exact source commit, SHA-256 checksums and completed test evidence must be supplied by the actual release receipt. A local compile alone does not prove a downloadable artifact or native acceptance. No paid signing or notarisation is promised.

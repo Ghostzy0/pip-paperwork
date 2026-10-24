@@ -10,6 +10,14 @@ All four source variants built and passed strict local ad-hoc signature checks. 
 
 Package identities and full artifact checksums are recorded in the version-specific release/audit receipts. No binary release is currently published; hashes from an earlier build must not be treated as a current download checksum.
 
+## Bounded Pip Core native review — 24 October
+
+Public355390f Pip Core executable `9f505faf7cff6351ed7a9da44c6da1fd4491d82b59e800e5846cb591fc2c1eb3` ran on macOS27.0.1/Apple silicon. Independent native inspection captured Paper and Oat in light/dark, opened the authored sample and used Command-F/Return to find and visibly select Page1. A20-second idle process sample (40samples) recorded median psCPU estimate0.0% and maximum sampled RSS221,792KiB. This is neither energy/latency evidence nor true peak memory. The app quit and exact process absence was verified.
+
+Resize drags did not establish the1000×640point minimum; Pause/checkmark/persistence, runtime Reduce Motion and VoiceOver remain unverified. App-level appearance was restored to system without changing OS preferences. Saved private app-only JPEG/AX evidence supports only these observed scenarios.
+
+Subsequent source review found busy-state holes: inspector callbacks could reach edits during OCR and duplicate Open buttons could retain enabled styling. Current source updates every app-chrome action copy, skips PDFKit internals, and refuses inspector/form/note/ink callbacks while busy. Independent source fix/recheck is separate from the rebuilt native OCR/Stop acceptance, which remains pending. The355390f run is not presented as a native test of this later correction.
+
 ## Native finding and current fix
 
 Earlier actual packaged testing found Command-Z in Find could change PDF data. Search typing Undo/Redo and document Undo/Redo routing subsequently passed separately. Modal form typing Undo still failed on the previous package despite a dedicated native undo manager. A headless AppKit probe proved native text history registration and direct undo/redo work; this did not reproduce a visible modal event loop.
@@ -41,4 +49,4 @@ The build downloads a checksum-pinned Go toolchain and locked modules. Runtime n
 
 ## Pending
 
-Latest Plus/Pip native acceptance; actual Paper/Oat/dark, keyboard/window/accessibility/reduced-motion checks; Plus language-picker/cancel and inspector-width/focus checks; representative CPU/RSS/latency; actual PDF Expert workflow/layout comparison; final public clean-clone builds and package review. Minimum-macOS GUI, VoiceOver, large-document responsiveness, Intel, genuine cryptographic signatures and notarisation are unverified. Ad-hoc signatures establish local package integrity only.
+Latest busy-state and matched Plus native acceptance; minimum-window/focus/accessibility/reduced-motion checks; Plus language-picker/cancel and inspector-width/focus checks; large-document CPU/RSS/latency; reference workflow/layout comparison and further gated reference features; final public clean-clone builds and package review. The earlier Pip palettes/keyboard and short idle sample do not close these gates. Minimum-macOS GUI, VoiceOver, large-document responsiveness, Intel, genuine cryptographic signatures and notarisation are unverified. Ad-hoc signatures establish local package integrity only.
