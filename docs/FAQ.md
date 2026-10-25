@@ -22,7 +22,7 @@ Encrypted, signed or restricted inputs are conservatively protected. An encrypte
 
 ## Is OCR editable?
 
-OCR creates a separate flattened searchable PDF. It rasterises the page and places recognised text for search and selection; editable annotations/forms are lost in that output. Recognition can be wrong. Core uses English recognition. Additional OCR languages and compact reading controls are planned for separate Plus releases and are not yet qualified.
+OCR creates a separate flattened searchable PDF. It rasterises the page and places recognised text for search and selection; editable annotations/forms are lost in that output. Recognition can be wrong. Core uses English recognition. Both Plus editions let you choose one language from Vision's current supported list and hide/restore the inspector. Selected chooser, French-output and inspector workflows have passed native checks; broader language accuracy and accessibility remain unverified.
 
 ## Which macOS versions and processors work?
 

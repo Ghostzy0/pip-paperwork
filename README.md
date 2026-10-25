@@ -2,7 +2,7 @@
 
 A local PDF workspace for macOS. Read, mark up and organise documents, then save a separate copy while keeping your original.
 
-**Source alpha under qualification.** This custom repository contains the neutral/Pip foundation and matched Plus variants. Selected Core and Plus workflows have been verified in the packaged apps on macOS 27.0.1; [TESTING](TESTING.md) records their scope and remaining checks. Build from source using the steps below. The separate [Paperwork Replica](https://github.com/Ghostzy0/pip-paperwork-replica) repository tracks an original recreation of observed PDF Expert workflows.
+**Experimental alpha.** This custom repository contains the neutral/Pip foundation and matched Plus variants. Selected Core and Plus workflows have been verified in the packaged apps on macOS 27.0.1; [TESTING](TESTING.md) records their scope and remaining checks. Build from source using the steps below. If [Releases](https://github.com/Ghostzy0/pip-paperwork/releases) lists a packaged prerelease, its entry provides the download and checksums. The separate [Paperwork Replica](https://github.com/Ghostzy0/pip-paperwork-replica) repository tracks an original recreation of observed PDF Expert workflows.
 
 ## On your Mac
 
@@ -28,7 +28,7 @@ Requires an Apple silicon Mac and Apple’s command-line developer tools (`xcode
 open 'build/Pip Paperwork.app'
 ```
 
-Use **Open sample** for a synthetic three-page document with a text field. Select text and choose Highlight, add a note, rotate a page, fill the sample field, then Save a copy. Open that output to inspect the changes. The baseline is `build/Paperwork Baseline.app`. All four editions use distinct bundle identities and recovery locations. Plus adds a choice of one OCR language from Vision’s runtime-supported list and a Hide/Show inspector control with a View-menu alternative. Core keeps its historical English OCR request. The Plus packages are `build/Paperwork Plus.app` and `build/Pip Paperwork Plus.app`. These source builds are experimental; no downloadable release or completed native qualification is claimed.
+Use **Open sample** for a synthetic three-page document with a text field. Select text and choose Highlight, add a note, rotate a page, fill the sample field, then Save a copy. Open that output to inspect the changes. The baseline is `build/Paperwork Baseline.app`. All four editions use distinct bundle identities and recovery locations. Plus adds a choice of one OCR language from Vision’s runtime-supported list and a Hide/Show inspector control with a View-menu alternative. Core keeps its historical English OCR request. The Plus packages are `build/Paperwork Plus.app` and `build/Pip Paperwork Plus.app`. Source builds and prereleases are experimental; the verification record identifies each tested workflow and remaining limit.
 
 A local build is ad-hoc signed, not Developer ID signed or notarised. For a downloaded release, macOS may ask you to confirm its source using the normal per-app opening flow. Do not disable Gatekeeper globally. No installer, system extension or background service is required. Delete the app to remove the executable; document and recovery data are separate.
 

@@ -10,9 +10,9 @@ Paperwork keeps the opened input as the protected original. Begin with **Open sa
 
 **Extract pages** accepts a range such as `1-3, 5` and preserves the entered order. **Split** writes page files in a new folder. **Export text** contains only available text; a scan may have none. **Export page image** writes a PNG of the current page.
 
-**Searchable scan copy** recognises English using on-device Vision. It creates a flattened output, so keep the editable original. Stop requests cancellation of recognition; no partial document should be saved. **Flatten a copy** paints annotations/forms into page content, while **Optimise a copy** may reduce image detail and may not make the file smaller.
+**Searchable scan copy** recognises English using on-device Vision. It creates a flattened output, so keep the editable original. Stop requests cancellation of recognition. In the recorded stopped scenarios, it kept the working copy and created no output. **Flatten a copy** paints annotations/forms into page content, while **Optimise a copy** may reduce image detail and may not make the file smaller.
 
-In Plus, Searchable scan first asks for one main language from the current Mac’s supported list. Canceling that chooser starts no OCR. Core continues its English request. Plus also offers Hide inspector/Show inspector in the toolbar and View menu; restore it to edit form fields or annotations. These controls remain in native qualification.
+In Plus, Searchable scan first asks for one main language from the current Mac’s supported list. Canceling that chooser starts no OCR. Core continues its English request. Plus also offers Hide inspector/Show inspector in the toolbar and View menu; restore it to edit form fields or annotations. Selected chooser, inspector and French-copy scenarios passed native checks; see TESTING for exact scope and open limits.
 
 Recovery is off by default. Enable it in File only if you want a local document-content snapshot. Restore opens a detached working copy; save it separately. Discard removes the stored recovery file, while later edits can create another if recovery remains on.
 
