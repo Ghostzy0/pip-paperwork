@@ -1,6 +1,7 @@
 name: Native build and regressions
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -17,13 +18,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify shared engine source pin
+        run: shasum -a 256 -c SHARED-CORE.sha256
       - name: Test canonical writer and native core
         run: |
           ./scripts/test.sh
           ./.build-tools/go/bin/go -C Engine test -p 2 ./...
-      - name: Build both editions and verify bundles
+      - name: Build four editions and verify bundles
         run: |
           ./scripts/build.sh baseline
           ./scripts/build.sh pip
+          ./scripts/build.sh baseline-plus
+          ./scripts/build.sh pip-plus
           codesign --verify --deep --strict 'build/Paperwork Baseline.app'
           codesign --verify --deep --strict 'build/Pip Paperwork.app'
+          codesign --verify --deep --strict 'build/Paperwork Plus.app'
+          codesign --verify --deep --strict 'build/Pip Paperwork Plus.app'

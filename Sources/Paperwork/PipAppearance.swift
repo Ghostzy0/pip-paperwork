@@ -9,7 +9,11 @@ enum PaperworkEdition: String {
 
     var usesPipTheme: Bool { self == .pip || self == .pipPlus }
     var hasPlusFeatures: Bool { self == .baselinePlus || self == .pipPlus }
-    var displayName: String { usesPipTheme ? "Pip Paperwork" : "Paperwork Baseline" }
+    var displayName: String {
+        if hasPlusFeatures { return usesPipTheme ? "Pip Paperwork Plus" : "Paperwork Plus" }
+        return usesPipTheme ? "Pip Paperwork" : "Paperwork Baseline"
+    }
+    var releaseVersion: String { hasPlusFeatures ? "0.2.0-alpha.1" : "0.1.0-alpha.1" }
     var defaultDataDirectory: String {
         switch self {
         case .baseline: "PaperworkBaseline"
@@ -157,7 +161,7 @@ final class PipActionButton: NSButton {
         let ink = isEnabled ? palette.ink : palette.secondary
         layer?.backgroundColor = (primary ? palette.ink : palette.canvas).cgColor
         layer?.borderWidth = primary ? 0 : 1
-        layer?.borderColor = palette.secondary.withAlphaComponent(0.35).cgColor
+        layer?.borderColor = palette.secondary.withAlphaComponent(0.75).cgColor
         let color = primary ? palette.canvas : ink
         attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: NSFont.systemFont(ofSize: 13, weight: .medium)])
         alphaValue = isEnabled ? 1 : 0.55

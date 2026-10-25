@@ -104,6 +104,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
             viewItems.append(("Use dark appearance", "", "modeDark"))
             viewItems.append(("Pause Pip", "", "pausePip"))
         }
+        if edition.hasPlusFeatures { viewItems.append(("Hide inspector", "I", "toggleInspector")) }
         menu("View", viewItems)
         if let viewMenu = root.items.first(where: { $0.submenu?.title == "View" })?.submenu {
             pausePipItem = viewMenu.items.first(where: { ($0.representedObject as? String) == "pausePip" })
@@ -122,6 +123,13 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     func button(_ title: String, _ action: String) -> NSButton {
         let b: NSButton = edition.usesPipTheme ? PipActionButton(title: title, target: self, action: #selector(command(_:))) : NSButton(title: title, target: self, action: #selector(command(_:))); if let pip = b as? PipActionButton { pip.primary = action == "save" }; b.identifier = .init(action); b.bezelStyle = .rounded; b.setAccessibilityLabel(title); b.toolTip = title; controls[action] = b; return b
+    }
+    func updateButtonStates(in view: NSView?) {
+        guard let view, !(view is PDFView), !(view is PDFThumbnailView) else { return }
+        if let button = view as? NSButton, let action = button.identifier?.rawValue, controls[action] != nil {
+            button.isEnabled = enabled(action)
+        }
+        for child in view.subviews { updateButtonStates(in: child) }
     }
     func row(_ views: [NSView], spacing: CGFloat = 8) -> NSStackView { let stack = NSStackView(views: views); stack.orientation = .horizontal; stack.spacing = spacing; stack.alignment = .centerY; return stack }
     func column(_ views: [NSView], spacing: CGFloat = 12) -> NSStackView { let stack = NSStackView(views: views); stack.orientation = .vertical; stack.spacing = spacing; stack.alignment = .leading; return stack }
@@ -142,6 +150,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         let titleWithPip = row([pipMark, titleGroup], spacing: 10)
         let header = row([edition.usesPipTheme ? titleWithPip : titleGroup, spacer, search, button("Find", "search"), button("Open PDF", "open"), button("Save a copy", "save")])
         let tools = row([button("Select", "select"), button("Highlight", "highlight"), button("Underline", "underline"), button("Strike", "strikeOut"), button("Note", "note"), button("Freehand", "ink"), button("Undo", "undo"), button("Redo", "redo"), button("More…", "more")])
+        if edition.hasPlusFeatures { tools.addArrangedSubview(button("Hide inspector", "toggleInspector")) }
         let pagebar = row([button("‹", "previous"), pageLabel, button("›", "next"), button("Go to…", "go"), button("−", "zoomOut"), button("+", "zoomIn"), button("Fit", "fit"), button("Rotate", "rotate"), button("Earlier", "earlier"), button("Later", "later"), button("Delete…", "delete")])
         controls["previous"]?.setAccessibilityLabel("Previous page"); controls["next"]?.setAccessibilityLabel("Next page"); controls["zoomOut"]?.setAccessibilityLabel("Zoom out"); controls["zoomIn"]?.setAccessibilityLabel("Zoom in")
         reader.autoScales = true; reader.displayMode = .singlePageContinuous; reader.displayDirection = .vertical; reader.delegate = self; reader.setAccessibilityLabel("PDF document")
@@ -155,7 +164,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         empty.addArrangedSubview(label("Read, mark up and organise PDFs locally.\nSave a separate copy when you are ready.", size: 15, secondary: true))
         empty.addArrangedSubview(button("Open a PDF", "open")); empty.addArrangedSubview(button("Try the sample", "sample")); empty.translatesAutoresizingMaskIntoConstraints = false; viewer.addSubview(empty)
         NSLayoutConstraint.activate([reader.leadingAnchor.constraint(equalTo: viewer.leadingAnchor), reader.trailingAnchor.constraint(equalTo: viewer.trailingAnchor), reader.topAnchor.constraint(equalTo: viewer.topAnchor), reader.bottomAnchor.constraint(equalTo: viewer.bottomAnchor), empty.centerXAnchor.constraint(equalTo: viewer.centerXAnchor), empty.centerYAnchor.constraint(equalTo: viewer.centerYAnchor)])
-        let body = row([thumbPanel, viewer, inspectorScroll], spacing: 12); body.alignment = .height
+        let body = row([thumbPanel, viewer, inspectorScroll], spacing: 12); body.alignment = .height; body.detachesHiddenViews = true
         status.font = .systemFont(ofSize: 12); status.textColor = .secondaryLabelColor; status.maximumNumberOfLines = 2
         progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
         let foot = row([progress, status, button("Stop", "stop")]); controls["stop"]?.isHidden = true
@@ -284,10 +293,11 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
             if let p = reader.document?.page(at: min(max(0, index), max(0, ws.document.pageCount - 1))) { reader.go(to: p) }
         } else { detail.stringValue = "Local PDF workspace" }
         reader.interactionEnabled = !busy
-        for (action, b) in controls { b.isEnabled = enabled(action) }
+        updateButtonStates(in: contentView)
         pageChanged(); updateInspector()
     }
     func enabled(_ action: String) -> Bool {
+        if action == "toggleInspector" { return edition.hasPlusFeatures && !busy }
         if action == "stop" { return busy }
         if busy { return false }
         if ["open", "sample", "about", "quit", "more", "dark", "restore", "discard", "recovery", "themePaper", "themeOat", "modeSystem", "modeLight", "modeDark", "pausePip"].contains(action) { return true }
@@ -310,6 +320,10 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
             item.state = selected ? .on : .off
             return edition.usesPipTheme
         }
+        if action == "toggleInspector" {
+            item.title = inspectorScroll.isHidden ? "Show inspector" : "Hide inspector"
+            return edition.hasPlusFeatures && !busy
+        }
         if action == "pausePip" { item.state = pipMark.isPaused ? .on : .off; return edition.usesPipTheme }
         return enabled(action)
     }
@@ -329,13 +343,13 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
                 let title = a.type == "Widget" ? (a.fieldName ?? "Form field") : (a.type ?? "Annotation")
                 inspector.addArrangedSubview(label(title, weight: .semibold))
                 inspector.addArrangedSubview(label(a.widgetStringValue ?? a.contents ?? "", secondary: true))
-                let action = NSButton(title: a.type == "Widget" ? "Edit field…" : "Remove annotation", target: self, action: #selector(inspectorAction(_:))); action.tag = i; action.isEnabled = ws.editable; inspector.addArrangedSubview(action)
+                let action = NSButton(title: a.type == "Widget" ? "Edit field…" : "Remove annotation", target: self, action: #selector(inspectorAction(_:))); action.tag = i; action.isEnabled = ws.editable && !busy; inspector.addArrangedSubview(action)
             }
         }
         inspector.addArrangedSubview(label("Your original stays unchanged. Save a copy to keep these edits.", size: 12, secondary: true))
         inspector.addArrangedSubview(button("Insert or merge…", "insert")); inspector.addArrangedSubview(button("Extract pages…", "extract")); inspector.addArrangedSubview(button("Searchable scan…", "ocr"))
         inspector.addArrangedSubview(label(recoveryEnabled ? "Recovery is on. A private local copy is kept after each edit." : "Recovery is off. Enable it in File to keep an editable local snapshot.", size: 12, secondary: true))
-        for (action, b) in controls { b.isEnabled = enabled(action) }
+        updateButtonStates(in: contentView)
         updatePipColors()
     }
     func perform(_ body: () throws -> Void, message: String = "Working copy updated. Save a copy to keep it.", page: Int? = nil, storeRecovery: Bool = true) {
@@ -409,6 +423,16 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
             colorMode = action == "modeLight" ? .light : (action == "modeDark" ? .dark : .system)
             UserDefaults.standard.set(colorMode.rawValue, forKey: "io.github.ghostzy0.paperwork.colorMode")
             applyPipAppearance()
+        case "toggleInspector":
+            let hiding = !inspectorScroll.isHidden
+            if hiding, let focused = window.firstResponder as? NSView, focused.isDescendant(of: inspectorScroll) { window.makeFirstResponder(reader) }
+            inspectorScroll.isHidden = hiding
+            let title = hiding ? "Show inspector" : "Hide inspector"
+            controls["toggleInspector"]?.title = title
+            controls["toggleInspector"]?.setAccessibilityLabel(title)
+            controls["toggleInspector"]?.toolTip = title
+            if let pipButton = controls["toggleInspector"] as? PipActionButton { pipButton.updateStyle() }
+            window.contentView?.layoutSubtreeIfNeeded()
         case "pausePip": pipMark.isPaused.toggle(); pausePipItem?.state = pipMark.isPaused ? .on : .off
         case "about": about()
         case "more":
@@ -460,14 +484,17 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
     }
     func showMatch() { let selection = matches[matchIndex]; reader.setCurrentSelection(selection, animate: false); reader.go(to: selection); announce("Match \(matchIndex + 1) of \(matches.count). Use Command G for the next.") }
     func addNote(_ page: PDFPage, _ point: NSPoint) {
+        guard !busy else { return }
         guard let ws, let text = input("Sticky note", message: "Write a note for this page.") else { return }
         perform({ try ws.annotate(.text, page: index(of: page), bounds: NSRect(x: point.x, y: point.y, width: 24, height: 24), text: text) })
     }
     func addInk(_ page: PDFPage, _ points: [NSPoint]) {
+        guard !busy else { return }
         guard let ws, let first = points.first else { return }; var box = NSRect(origin: first, size: NSSize(width: 1, height: 1)); for p in points { box = box.union(NSRect(origin: p, size: NSSize(width: 1, height: 1))) }; box = box.insetBy(dx: -3, dy: -3)
         perform({ try ws.annotate(.ink, page: index(of: page), bounds: box, points: points) })
     }
     func editForm(_ page: PDFPage, _ annotation: PDFAnnotation) {
+        guard !busy else { return }
         guard let ws, ws.editable else { announce("This PDF is read-only."); return }
         guard let annotationIndex = page.annotations.firstIndex(of: annotation), let corePage = ws.document.page(at: index(of: page)), corePage.annotations.indices.contains(annotationIndex) else { return }
         let annotation = corePage.annotations[annotationIndex]
@@ -491,22 +518,49 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         perform({ try ws.fill(page: index(of: page), annotation: annotationIndex, value: value) })
     }
     @objc func formChoice(_ sender: NSMenuItem) {
+        guard !busy else { return }
         guard let item = sender.representedObject as? [String: Any], let page = item["page"] as? Int, let annotation = item["annotation"] as? Int, let value = item["value"] as? String else { return }
         perform({ try ws?.fill(page: page, annotation: annotation, value: value) })
     }
     @objc func inspectorAction(_ sender: NSButton) {
-        guard let ws, let page = ws.document.page(at: currentIndex), page.annotations.indices.contains(sender.tag) else { return }; let a = page.annotations[sender.tag]
+        guard !busy, let ws, let page = ws.document.page(at: currentIndex), page.annotations.indices.contains(sender.tag) else { return }; let a = page.annotations[sender.tag]
         if a.type == "Widget" { editForm(page, a) } else { perform({ try ws.removeAnnotation(page: currentIndex, annotation: sender.tag) }) }
     }
+    func chooseOCRLanguage() throws -> [String]? {
+        let supported = try LocalOCR.supportedRecognitionLanguages()
+        guard !supported.isEmpty else { throw PaperworkError.invalid("No OCR languages are available on this Mac.") }
+        let ordered = supported.sorted {
+            let left = Locale.current.localizedString(forIdentifier: $0) ?? $0
+            let right = Locale.current.localizedString(forIdentifier: $1) ?? $1
+            return left.localizedStandardCompare(right) == .orderedAscending
+        }
+        let alert = NSAlert(); alert.messageText = "OCR language"
+        alert.informativeText = "Choose the main language in this scan. Available languages depend on macOS. Recognition can make mistakes."
+        alert.addButton(withTitle: "Continue"); alert.addButton(withTitle: "Cancel")
+        let picker = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 340, height: 28))
+        for code in ordered { picker.addItem(withTitle: "\(Locale.current.localizedString(forIdentifier: code) ?? code) (\(code))") }
+        picker.setAccessibilityLabel("OCR language")
+        if let english = ordered.firstIndex(of: "en-GB") ?? ordered.firstIndex(where: { $0.hasPrefix("en-") }) { picker.selectItem(at: english) }
+        alert.accessoryView = picker; alert.window.initialFirstResponder = picker
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        guard ordered.indices.contains(picker.indexOfSelectedItem) else { throw PaperworkError.invalid("Choose an available OCR language.") }
+        return try LocalOCR.validateRecognitionLanguages([ordered[picker.indexOfSelectedItem]], supportedBy: supported)
+    }
     func startOCR() {
-        guard let ws, confirm("Make a searchable scan copy?", "This uses on-device English recognition. Pages are flattened into images with invisible searchable text. Forms and annotations will no longer be editable. Recognition can make mistakes.", action: "Recognise text") else { return }
+        guard let ws else { return }
         do {
+            let languages: [String]
+            if edition.hasPlusFeatures { guard let chosen = try chooseOCRLanguage() else { return }; languages = chosen }
+            else { languages = ["en-GB"] }
+            let languageNames = languages.map { Locale.current.localizedString(forIdentifier: $0) ?? $0 }.joined(separator: ", ")
+            guard confirm("Make a searchable scan copy?", "This uses on-device recognition: \(languageNames). Pages are flattened into images with invisible searchable text. Forms and annotations will no longer be editable. Recognition can make mistakes.", action: "Recognise text") else { return }
+            let selectedLanguages: [String]? = edition.hasPlusFeatures ? languages : nil
             let bytes = try ws.data(); let flag = CancellationFlag(); cancelFlag = flag; busy = true; progress.startAnimation(nil); controls["stop"]?.isHidden = false; refresh(); announce("Recognising text on this Mac.")
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                let result = Result { try LocalOCR.searchableCopy(data: bytes, cancelled: { flag.isCancelled }, progress: { done, total in DispatchQueue.main.async { self?.status.stringValue = "Recognising page \(done) of \(total)." } }) }
+                let result = Result { try LocalOCR.searchableCopy(data: bytes, cancelled: { flag.isCancelled }, progress: { done, total in DispatchQueue.main.async { self?.status.stringValue = "Recognising page \(done) of \(total)." } }, recognitionLanguages: selectedLanguages) }
                 DispatchQueue.main.async {
                     guard let self else { return }; self.busy = false; self.cancelFlag = nil; self.progress.stopAnimation(nil); self.controls["stop"]?.isHidden = true; self.refresh()
-                    switch result { case .success(let pdf): if flag.isCancelled { self.announce("OCR stopped. Your working copy was kept."); return }; self.announce("Recognition finished. Choose where to save the searchable copy."); self.save(suffix: "searchable", output: pdf)
+                    switch result { case .success(let pdf): if flag.isCancelled { self.announce("OCR stopped. Your working copy was kept."); return }; self.announce("Recognition finished in \(languageNames). Choose where to save the searchable copy."); self.save(suffix: "searchable", output: pdf)
                     case .failure(let error): self.showError(error) }
                 }
             }
@@ -521,7 +575,7 @@ final class PaperworkApp: NSObject, NSApplicationDelegate, NSWindowDelegate, PDF
         if p.runModal() == .OK, let url = p.url { perform({ let size = page.bounds(for: .mediaBox).size; guard size.width <= 2400, size.height <= 2400 else { throw PaperworkError.invalid("Extract a smaller page before exporting an image.") }; let img = page.thumbnail(of: NSSize(width: size.width * 2, height: size.height * 2), for: .mediaBox); guard let tiff = img.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { throw PaperworkError.invalid("The page image could not be prepared.") }; try Workspace.writeNew(png, to: url) }, message: "Page image exported.") }
     }
     func about() {
-        let alert = NSAlert(); alert.messageText = "\(edition.displayName) · 0.1.0-alpha.1"; alert.informativeText = "An original local PDF workspace by Ghostzy0.\n\nBuilt with Apple PDFKit and Vision. MIT app source. PDF Expert and Adobe Acrobat are independent workflow references; no affiliation.\n\nExperimental: supported forms only; no redaction, cryptographic signing or content-text replacement. OCR flattens pages. Encrypted and signed PDFs are read-only.\n\nSource and issue tracker: github.com/Ghostzy0/pip-paperwork"; alert.addButton(withTitle: "OK"); alert.beginSheetModal(for: window)
+        let alert = NSAlert(); alert.messageText = "\(edition.displayName) · \(edition.releaseVersion)"; alert.informativeText = "An original local PDF workspace by Ghostzy0.\n\nBuilt with Apple PDFKit and Vision. MIT app source. PDF Expert and Adobe Acrobat are independent workflow references; no affiliation.\n\nExperimental: supported forms only; no redaction, cryptographic signing or content-text replacement. OCR flattens pages. Encrypted and signed PDFs are read-only.\n\nSource and issue tracker: github.com/Ghostzy0/pip-paperwork"; alert.addButton(withTitle: "OK"); alert.beginSheetModal(for: window)
     }
     func pdfViewWillClick(onLink sender: PDFView, with url: URL) { announce("Links are inert in this local workspace. Copy a URL into your browser if you choose to visit it.") }
     func pdfViewOpenPDF(_ sender: PDFView, forRemoteGoToAction action: PDFActionRemoteGoTo) { announce("Opening remote documents from a PDF is disabled.") }
