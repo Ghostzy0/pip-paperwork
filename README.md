@@ -2,7 +2,7 @@
 
 A local PDF workspace for macOS. Read, mark up and organise documents, then save a separate copy while keeping your original.
 
-**Source alpha under qualification.** This custom repository contains the neutral/Pip foundation and matched Plus variants. Selected Plus workflows have been verified in the packaged apps on macOS 27.0.1; [TESTING](TESTING.md) records their scope and remaining checks. Build from source using the steps below. The separate [Paperwork Replica](https://github.com/Ghostzy0/pip-paperwork-replica) repository tracks an original recreation of observed PDF Expert workflows.
+**Source alpha under qualification.** This custom repository contains the neutral/Pip foundation and matched Plus variants. Selected Core and Plus workflows have been verified in the packaged apps on macOS 27.0.1; [TESTING](TESTING.md) records their scope and remaining checks. Build from source using the steps below. The separate [Paperwork Replica](https://github.com/Ghostzy0/pip-paperwork-replica) repository tracks an original recreation of observed PDF Expert workflows.
 
 ## On your Mac
 

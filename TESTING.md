@@ -1,49 +1,46 @@
-# Testing and evidence
+# Verification and open gates
 
-25 October 2026. Experimental source; no published binary or full reference-parity claim. Core/Pip share one document engine; Plus adds a runtime-supported OCR language picker and inspector collapse. The focused public modal Undo fix passed its exact-head native retest. On macOS 27.0.1, selected native scenarios of the exact custom `7a806fe987efd2c2e7dc67f6344f057c1d7e2f08` Plus packages passed: Neutral Plus French searchable-copy save/reopen and Pip Plus sample inspector button/Cmd-Shift-I. These bounded observations do not qualify the whole app, busy-state behavior, minimum-window layout, VoiceOver or reference-layout parity.
+25 October 2026. Experimental source with selected packaged workflows verified; no stable release, full PDF compatibility or reference-parity claim. All four configurations share the document engine and source pin.
 
-## Current local run
+## Source and package identities
 
-The current shared engine passed **36 XCTest cases, zero failures**, in2.218seconds on Apple silicon/macOS27. Both formerly failing OCR cases now pass: the historical Core en-GB request remains independent of Vision’s advertised language list, and cancellation after page1 returns no partial PDF. A new focused regression proves Core does not query that list while explicit Plus selections still validate it. The French scanned-token case ran and passed on this host; that single clean fixture is not an accuracy benchmark or a claim for every language.
+Runtime source [`7a806fe987efd2c2e7dc67f6344f057c1d7e2f08`](https://github.com/Ghostzy0/pip-paperwork/commit/7a806fe987efd2c2e7dc67f6344f057c1d7e2f08) passed a fresh source checkout, 36 tests, four production builds and strict local ad-hoc signature/resource checks. [Hosted macOS 14 CI](https://github.com/Ghostzy0/pip-paperwork/actions/runs/40122871029) also passed. Later documentation/screenshot head [`872acd4`](https://github.com/Ghostzy0/pip-paperwork/commit/872acd44bfec7c51e0ce55c02ff6e6a7e879d819) passed [CI](https://github.com/Ghostzy0/pip-paperwork/actions/runs/40166683806); its runtime inputs are unchanged.
 
-All four source variants built and passed strict local ad-hoc signature checks. Parent checks confirmed distinct edition/bundle/data/version identities, matching original icon/starter resources and no tested private-home-path markers in stripped executables. Core version0.1.0-alpha.1; Plus0.2.0-alpha.1. These are local package results, not downloadable release receipts or notarisation.
+| Package | Release version | Executable SHA-256 |
+| --- | --- | --- |
+| Paperwork Baseline | 0.1.0-alpha.1 | `d47eaec178acc689bd6a261ed8de3223ce5c1fd11ffa5a9812f49f97c11a9225` |
+| Pip Paperwork | 0.1.0-alpha.1 | `18300d08df1f6bb17e0a615cc6e7d5f582d4689ce72d95ac5c926ad6e31030eb` |
+| Paperwork Plus | 0.2.0-alpha.1 | `c4f46bb0de3d79422c3658a1ffa0bea03f9f51756f1b65abe27cd26b735529c0` |
+| Pip Paperwork Plus | 0.2.0-alpha.1 | `fa063e21e5ab98f061638f58a2800beee64a157662674dbbff73518d84f61430` |
 
-Package identities and full artifact checksums are recorded in the version-specific release/audit receipts. No binary release is currently published; hashes from an earlier build must not be treated as a current download checksum.
+The bundles have distinct identities/recovery locations, original edition icons, the canonical sample PDF and third-party notices. Runtime needs neither Go nor Python. Executable hashes identify tested local packages; downloadable ZIP checksums belong to their release assets. Ad-hoc signing is not Developer ID signing or notarisation.
+
+## Selected native observations — 24–25 October
+
+These scenarios used authored synthetic documents on Apple silicon/macOS 27.0.1. Saved JPEG/AX evidence was independently reviewed. Apps quit normally and exact executable process absence was verified after each slice.
+
+| Edition | Observed result | Limits |
+| --- | --- | --- |
+| Neutral Core and Pip Core | Each opened the three-page sample, edited its contact, saved a separate copy and reopened the edited value. Independent PDF parsing verified both three-page outputs; all nine captures were reviewed. | No arbitrary-PDF or minimum-window acceptance. |
+| Neutral Plus | Language chooser Cancel, `fr-FR` searchable-copy save/reopen, inspector button and Cmd-Shift-I passed. Output parsing found the authored French sentinel. | One language/fixture is not an accuracy benchmark. |
+| Pip Plus | Sample render, language chooser Cancel, inspector button/Cmd-Shift-I, and a separate `fr-FR` searchable-copy save/reopen passed. Output parsing found the French sentinel. | No general OCR or language-coverage claim. |
+| Both Plus editions, separately | On an authored 73-page PDF, edited contact and unsaved state were present before OCR. At observed page32/73, visible Open PDF/Edit field were disabled and Stop was available. Stop reported that it kept the working copy; edited contact and unsaved state remained, output was empty and input hash unchanged. All eight chooser/busy/alert/after-stop captures were reviewed. | OCR was deliberately stopped. Hidden/menu action copies were source-reviewed rather than separately activated. A subsequent field mutation was not driven; Issue7 remains open. |
+
+The dense input was 62,141,842 bytes, SHA-256 `6a723b1d13a8a72536579e414d8bfa64a4d1865c5a36a1939d7764c13dd5c904`. It is separate from an earlier 33-page attempt that finished before busy state was observed. That earlier attempt is not a Stop pass. See [Issue7](https://github.com/Ghostzy0/pip-paperwork/issues/7#issuecomment-6395468806).
 
 ## Selected Plus native observations — 24 October
 
-Both receipts below identify exact custom `7a806fe987efd2c2e7dc67f6344f057c1d7e2f08` packages on macOS 27.0.1 and synthetic content. The screenshots are original first-party app captures copied byte-for-byte into `assets/screenshots/` for the README.
+README screenshots are byte-for-byte first-party captures from the packages above, using synthetic documents: [Neutral Plus French copy](assets/screenshots/neutral-plus-french-copy.jpg), [Pip Plus inspector](assets/screenshots/pip-plus-sample-inspector.jpg). The later checks above extend those bounded examples.
 
-- Neutral Plus executable `c4f46bb0de3d79422c3658a1ffa0bea03f9f51756f1b65abe27cd26b735529c0`: French (France), `fr-FR`, selected after chooser cancellation, then one searchable copy saved and reopened; AX and independent read-only PDF inspection found the synthetic French sentinel text. Inspector button/keyboard was also observed. [screenshot](assets/screenshots/neutral-plus-french-copy.jpg)
-- Pip Plus executable `fa063e21e5ab98f061638f58a2800beee64a157662674dbbff73518d84f61430`: bundled three-page synthetic sample rendered; language chooser opened and Cancel returned to the same sample; inspector button and Cmd-Shift-I hid/restored the inspector. [screenshot](assets/screenshots/pip-plus-sample-inspector.jpg)
+## Fixes and earlier evidence
 
-These are partial per-build observations, not overall app acceptance. Busy-state/Stop behavior and VoiceOver remain unverified. Minimum-window layout and further native Plus scenarios remain open. Both screenshots use authored synthetic documents.
+The canonical sample repaired a measured macOS14 font defect. Earlier tests failed before that correction; the repaired sample passed subsequent CI. The [modal Undo correction](https://github.com/Ghostzy0/pip-paperwork/pull/2) passed independent actual per-key typing Undo/Redo, Return/Escape, Find and document-history isolation on executable `5a5165a6e9faf5a92e23c254245a3deb81f7509c9d5a13dd63131a9b674b6672` at source `81f0df0`. This is identified earlier-build evidence, rather than a new full-app test of every package above.
 
-## Bounded Pip Core native review — 24 October
+Earlier independent engine checks exercised seven Go tests, eight PDF-output groups and targeted adversarial helper/exporter cases, covering canonical forms/appearance, page operations, flattening, protected inputs/aliases and create-only saves. These checks do not prove compatibility with every PDF.
 
-Public355390f Pip Core executable `9f505faf7cff6351ed7a9da44c6da1fd4491d82b59e800e5846cb591fc2c1eb3` ran on macOS27.0.1/Apple silicon. Independent native inspection captured Paper and Oat in light/dark, opened the authored sample and used Command-F/Return to find and visibly select Page1. A20-second idle process sample (40samples) recorded median psCPU estimate0.0% and maximum sampled RSS221,792KiB. This is neither energy/latency evidence nor true peak memory. The app quit and exact process absence was verified.
-
-Resize drags did not establish the1000×640point minimum; Pause/checkmark/persistence, runtime Reduce Motion and VoiceOver remain unverified. App-level appearance was restored to system without changing OS preferences. Saved private app-only JPEG/AX evidence supports only these observed scenarios.
-
-Subsequent source review found busy-state holes: inspector callbacks could reach edits during OCR and duplicate Open buttons could retain enabled styling. Current source updates every app-chrome action copy, skips PDFKit internals, and refuses inspector/form/note/ink callbacks while busy. Independent source fix/recheck is separate from the rebuilt native OCR/Stop acceptance, which remains pending. The355390f run is not presented as a native test of this later correction.
-
-## Native finding and current fix
-
-Earlier actual packaged testing found Command-Z in Find could change PDF data. Search typing Undo/Redo and document Undo/Redo routing subsequently passed separately. Modal form typing Undo still failed on the previous package despite a dedicated native undo manager. A headless AppKit probe proved native text history registration and direct undo/redo work; this did not reproduce a visible modal event loop.
-
-The newest fix temporarily routes the modal’s Undo/Redo menu actions through native nil-target responder-chain dispatch and restores document routing on exit. Independent actual keyboard/menu testing passed on public Core head81f0df0552264a33db6a3768758db410f26ae8eb, executable5a5165a6e9faf5a92e23c254245a3deb81f7509c9d5a13dd63131a9b674b6672: modal Undo/Redo, submit/cancel, Find history and document history stayed separate. Earlier failures remain in the audit history. This is scoped fix acceptance; current Plus/Pip/AT and release qualification is separate. Screenshots appeared inline but were not saved as local PNG files in that retest.
-
-Actual earlier synthetic save/reopen retained three pages, the edited contact, highlight and page rotation; save cancellation preserved the working copy. The canonical bundled starter also saved and reopened with its edited field. Those are bounded identified-package observations, not acceptance of the newest packages or arbitrary PDFs.
-
-## Cross-OS and independent checks
-
-Previous independent reviews exercised seven Go helper tests and eight pypdf output groups, including canonical form/button state, page operations, flattening, protected inputs/aliases and create-only saves. Newly changed OCR/UI code has a separate source review with no confirmed critical/high defect; native verification remains separate.
-
-The first hosted macOS14 run39890474271 failed on a programmatic starter font defect and a legitimate ancillary Popup assertion. The corrected canonical starter and annotation assertions passed32nativecases plus Go tests and both Core packages in [run39891343307](https://github.com/Ghostzy0/pip-paperwork/actions/runs/39891343307). Public Plus head3cbe9994f685b5e613ad38c992dc31359dfc7322 passed36cases and all four builds in [macOS14 run40117568228](https://github.com/Ghostzy0/pip-paperwork/actions/runs/40117568228). Minimum-version GUI acceptance remains unverified.
+Earlier Pip Core source `355390f`/executable `9f505faf7cff6351ed7a9da44c6da1fd4491d82b59e800e5846cb591fc2c1eb3` passed actual Paper/Oat light/dark and keyboard-search inspection. A 20-second/40-sample idle process recording measured median estimated CPU0.0% and maximum sampled RSS221,792KiB. This is not energy/latency, true peak memory or a measurement of the later packages. Resize attempts did not establish the native minimum size; motion and VoiceOver remain unverified.
 
 ## Reproduce
-
-From the standalone root:
 
 ```sh
 ./scripts/test.sh
@@ -54,8 +51,10 @@ From the standalone root:
 ./scripts/build.sh pip-plus
 ```
 
-The build downloads a checksum-pinned Go toolchain and locked modules. Runtime needs neither Go nor Python. Fixture passwords are public synthetic test values. Regeneration/independent checks are documented in the fixture README.
+The first helper build downloads a checksum-pinned Go toolchain and locked modules. Fixture passwords are public synthetic values. See the fixture README for regeneration and independent output checks.
 
-## Pending
+## Open limits
 
-Busy-state/Stop acceptance; minimum-window/focus/accessibility/reduced-motion checks; Pip Plus successful OCR and inspector-width/focus measurements; large-document CPU/RSS/latency; reference workflow/layout comparison and further gated reference features; final public clean-clone builds and package review. The earlier Pip palettes/keyboard and short idle sample do not close these gates. Minimum-macOS GUI, VoiceOver, large-document responsiveness, Intel, genuine cryptographic signatures and notarisation are unverified. Ad-hoc signatures establish local package integrity only.
+Post-Stop field mutation; activation of hidden/menu action copies while busy; minimum-window, keyboard-only, VoiceOver and runtime reduced-motion behavior; general OCR accuracy/large-document completion, latency and peak resources; further graphical export/merge/recovery workflows; Intel and macOS14 GUI acceptance remain unverified. French output and deliberate dense Stop are distinct completed scenarios. No cryptographic-signature, secure-redaction or notarisation claim is made.
+
+This custom UI is separate from the original [reader recreation](https://github.com/Ghostzy0/pip-paperwork-replica), whose source/native evidence and reference gaps are documented in its own repository.
