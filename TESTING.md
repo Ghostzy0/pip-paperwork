@@ -1,6 +1,6 @@
 # Testing and evidence
 
-24 October 2026. Experimental source; no published binary or full reference-parity claim. Core/Pip share one document engine; Plus adds a runtime-supported OCR language picker and inspector collapse. The focused public modal Undo fix passed its exact-head native retest. Latest Plus/Pip skin, feature and release qualification remains pending.
+25 October 2026. Experimental source; no published binary or full reference-parity claim. Core/Pip share one document engine; Plus adds a runtime-supported OCR language picker and inspector collapse. The focused public modal Undo fix passed its exact-head native retest. On macOS 27.0.1, selected native scenarios of the exact custom `7a806fe987efd2c2e7dc67f6344f057c1d7e2f08` Plus packages passed: Neutral Plus French searchable-copy save/reopen and Pip Plus sample inspector button/Cmd-Shift-I. These bounded observations do not qualify the whole app, busy-state behavior, minimum-window layout, VoiceOver or reference-layout parity.
 
 ## Current local run
 
@@ -9,6 +9,15 @@ The current shared engine passed **36 XCTest cases, zero failures**, in2.218seco
 All four source variants built and passed strict local ad-hoc signature checks. Parent checks confirmed distinct edition/bundle/data/version identities, matching original icon/starter resources and no tested private-home-path markers in stripped executables. Core version0.1.0-alpha.1; Plus0.2.0-alpha.1. These are local package results, not downloadable release receipts or notarisation.
 
 Package identities and full artifact checksums are recorded in the version-specific release/audit receipts. No binary release is currently published; hashes from an earlier build must not be treated as a current download checksum.
+
+## Selected Plus native observations — 24 October
+
+Both receipts below identify exact custom `7a806fe987efd2c2e7dc67f6344f057c1d7e2f08` packages on macOS 27.0.1 and synthetic content. The screenshots are original first-party app captures copied byte-for-byte into `assets/screenshots/` for the README.
+
+- Neutral Plus executable `c4f46bb0de3d79422c3658a1ffa0bea03f9f51756f1b65abe27cd26b735529c0`: French (France), `fr-FR`, selected after chooser cancellation, then one searchable copy saved and reopened; AX and independent read-only PDF inspection found the synthetic French sentinel text. Inspector button/keyboard was also observed. [screenshot](assets/screenshots/neutral-plus-french-copy.jpg)
+- Pip Plus executable `fa063e21e5ab98f061638f58a2800beee64a157662674dbbff73518d84f61430`: bundled three-page synthetic sample rendered; language chooser opened and Cancel returned to the same sample; inspector button and Cmd-Shift-I hid/restored the inspector. [screenshot](assets/screenshots/pip-plus-sample-inspector.jpg)
+
+These are partial per-build observations, not overall app acceptance. Busy-state/Stop behavior and VoiceOver remain unverified. Minimum-window layout and further native Plus scenarios remain open. Both screenshots use authored synthetic documents.
 
 ## Bounded Pip Core native review — 24 October
 
@@ -49,4 +58,4 @@ The build downloads a checksum-pinned Go toolchain and locked modules. Runtime n
 
 ## Pending
 
-Latest busy-state and matched Plus native acceptance; minimum-window/focus/accessibility/reduced-motion checks; Plus language-picker/cancel and inspector-width/focus checks; large-document CPU/RSS/latency; reference workflow/layout comparison and further gated reference features; final public clean-clone builds and package review. The earlier Pip palettes/keyboard and short idle sample do not close these gates. Minimum-macOS GUI, VoiceOver, large-document responsiveness, Intel, genuine cryptographic signatures and notarisation are unverified. Ad-hoc signatures establish local package integrity only.
+Busy-state/Stop acceptance; minimum-window/focus/accessibility/reduced-motion checks; Pip Plus successful OCR and inspector-width/focus measurements; large-document CPU/RSS/latency; reference workflow/layout comparison and further gated reference features; final public clean-clone builds and package review. The earlier Pip palettes/keyboard and short idle sample do not close these gates. Minimum-macOS GUI, VoiceOver, large-document responsiveness, Intel, genuine cryptographic signatures and notarisation are unverified. Ad-hoc signatures establish local package integrity only.

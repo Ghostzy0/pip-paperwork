@@ -2,7 +2,7 @@
 
 A local PDF workspace for macOS. Read, mark up and organise documents, then save a separate copy while keeping your original.
 
-**Experimental alpha in qualification.** This is an original app, inspired by common PDF workflows. It is not a PDF Expert or Acrobat fork and is not affiliated with either product. The tested plain native foundation precedes final GUI acceptance and the Pip edition. A separate recreation repository is planned for observed PDF Expert workflow/layout parity; the present neutral layout has not passed that comparison. This custom repository contains the original neutral/Pip foundation and matched Plus source variants. All four build commands work locally; native acceptance and published binaries remain pending. Native acceptance and release status are recorded in [TESTING](TESTING.md).
+**Source alpha under qualification.** This custom repository contains the neutral/Pip foundation and matched Plus variants. Selected Plus workflows have been verified in the packaged apps on macOS 27.0.1; [TESTING](TESTING.md) records their scope and remaining checks. Build from source using the steps below. The separate [Paperwork Replica](https://github.com/Ghostzy0/pip-paperwork-replica) repository tracks an original recreation of observed PDF Expert workflows.
 
 ## On your Mac
 
@@ -34,6 +34,18 @@ A local build is ad-hoc signed, not Developer ID signed or notarised. For a down
 
 [How to read, annotate and save](docs/HOW-TO.md) · [FAQ](docs/FAQ.md) · [AI setup prompt and verification](docs/AI-SETUP.md) · [Privacy and storage](docs/PRIVACY.md) · [Provenance](UPSTREAM.md) · [Known gaps](PARITY.md) · [Change notes](CHANGELOG.md)
 
+## Selected native examples
+
+Captured from the packaged Plus apps on macOS 27.0.1, revision [`7a806fe`](https://github.com/Ghostzy0/pip-paperwork/commit/7a806fe987efd2c2e7dc67f6344f057c1d7e2f08), using authored synthetic documents. See [testing details](TESTING.md#selected-plus-native-observations--24-october) for exact executable hashes, observed steps and open checks.
+
+![Neutral Plus after reopening a searchable French copy from a synthetic scan](assets/screenshots/neutral-plus-french-copy.jpg)
+
+*Neutral Plus — synthetic French searchable copy reopened after save; one observed scenario.*
+
+![Pip Plus sample with the inspector restored](assets/screenshots/pip-plus-sample-inspector.jpg)
+
+*Pip Plus — bundled synthetic sample with the inspector restored using Cmd-Shift-I; one observed scenario.*
+
 ## Shared engine identity
 
 `SHARED-CORE.sha256` records the PDF/OCR/recovery/sample engine and canonical-writer sources shared by the configurations. Verify it from the repository root with `shasum -a 256 -c SHARED-CORE.sha256`. The separate recreation repository must preserve or explicitly explain this source pin; matching hashes do not establish functional or visual parity.
@@ -46,4 +58,4 @@ Input is limited to 180 MB and 2,000 pages. OCR is limited to 100 pages and medi
 
 ## About
 
-Maintained by [Ghostzy0](https://github.com/Ghostzy0). Original MIT app code, using macOS PDFKit/Vision and the system font. PDFKit/Vision plus the pinned Apache-licensed pdfcpu canonical writer; no model weights. Workflow references: [PDF Expert](https://pdfexpert.com/), [Adobe Acrobat](https://www.adobe.com/acrobat.html), and [Apple PDFKit](https://developer.apple.com/documentation/pdfkit). Trademarks belong to their respective owners. Synthetic screenshots will be added from the actual packaged app after verification.
+Maintained by [Ghostzy0](https://github.com/Ghostzy0). Original MIT app code, using macOS PDFKit/Vision and the system font. PDFKit/Vision plus the pinned Apache-licensed pdfcpu canonical writer; no model weights. Workflow references: [PDF Expert](https://pdfexpert.com/), [Adobe Acrobat](https://www.adobe.com/acrobat.html), and [Apple PDFKit](https://developer.apple.com/documentation/pdfkit). Trademarks belong to their respective owners. Screenshots above are from the actual packaged app and use synthetic content.

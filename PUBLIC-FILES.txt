@@ -69,3 +69,5 @@ assets/AppIcon-Pip.icns
 assets/previews/AppIcon-Baseline-preview.png
 assets/previews/AppIcon-Pip-preview.png
 SHARED-CORE.sha256
+assets/screenshots/neutral-plus-french-copy.jpg
+assets/screenshots/pip-plus-sample-inspector.jpg
